@@ -66,6 +66,9 @@ namespace RasFocusPro
         [DllImport("user32.dll")]
         static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
 
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
+
         // Constants
         private const int SW_MINIMIZE = 6;
         private const int SW_RESTORE = 9;
@@ -137,26 +140,28 @@ namespace RasFocusPro
 
         public MainWindow()
         {
-            // 1. Single Instance Check & Wakeup Broadcast (CRASH FIXED)
+            // 1. Single Instance Check & Wakeup Broadcast
             bool createdNew = false;
             try
             {
-                // Mutex তৈরি করার চেষ্টা করছে
                 _mutex = new Mutex(true, "RasFocusPro_Mutex_V55", out createdNew);
             }
             catch (AbandonedMutexException)
             {
-                // আগের অ্যাপ যদি ফোর্স স্টপ বা ক্র্যাশ করে বন্ধ হয়, তবে Mutex Abandoned হয়ে যায়।
-                // তখন এটি ক্যাচ করে অ্যাপ ক্র্যাশ থেকে বাঁচাবে এবং নতুন সেশন শুরু করবে।
                 createdNew = true;
             }
 
             if (!createdNew)
             {
-                // যদি অ্যাপ আগে থেকেই চালু থাকে, তবে গ্লোবাল ব্রডকাস্ট পাঠিয়ে আগের উইন্ডোকে জাগিয়ে তুলবে।
-                PostMessage((IntPtr)HWND_BROADCAST, WM_WAKEUP, IntPtr.Zero, IntPtr.Zero);
-                
-                // সাইলেন্টলি দ্বিতীয় অ্যাপটি কিল করে দিবে, কোনো WPF UI এরর ছাড়াই।
+                IntPtr hExisting = FindWindow(null, "RasFocus Pro");
+                if (hExisting != IntPtr.Zero)
+                {
+                    PostMessage(hExisting, WM_WAKEUP, IntPtr.Zero, IntPtr.Zero);
+                }
+                else
+                {
+                    PostMessage((IntPtr)HWND_BROADCAST, WM_WAKEUP, IntPtr.Zero, IntPtr.Zero);
+                }
                 Environment.Exit(0);
                 return;
             }
@@ -165,6 +170,12 @@ namespace RasFocusPro
             _instance = this;
             this.Title = "RasFocus Pro";
 
+            // কনস্ট্রাক্টরে ভারী কাজ না করে UI লোড হওয়ার জন্য অপেক্ষা করা হচ্ছে (প্রথমবারের ক্র্যাশ ফিক্স)
+            this.Loaded += MainWindow_Loaded;
+        }
+
+        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        {
             // 2. Set App Icon (Top Left & Tray)
             SetAppIcons();
 
@@ -178,7 +189,7 @@ namespace RasFocusPro
             LoadData();
             RefreshRunningApps();
             SetupTrayIcon();
-            SetupEyeFilters();
+            SetupEyeFilters(); // এখন এটি নিরাপদ, কারণ মেইন উইন্ডো অলরেডি লোড হয়ে গেছে
 
             _proc = HookCallback;
             _hookID = SetHook(_proc);
@@ -255,7 +266,6 @@ namespace RasFocusPro
             catch { /* Silently fail if registry access is denied */ }
         }
 
-        // Catch WM_WAKEUP to bring window to front
         protected override void OnSourceInitialized(EventArgs e)
         {
             base.OnSourceInitialized(e);
@@ -320,7 +330,6 @@ namespace RasFocusPro
             this.Topmost = false; 
             this.Focus();
             
-            // Native force to foreground
             IntPtr hWnd = new WindowInteropHelper(this).Handle;
             ShowWindow(hWnd, SW_RESTORE);
             SetForegroundWindow(hWnd);
@@ -647,15 +656,13 @@ namespace RasFocusPro
         }
 
         // ==========================================
-        // REAL-TIME KEYBOARD HOOK (TYPING BLOCKER)
+        // REAL-TIME KEYBOARD HOOK (TYPING BLOCKER) (SINGLE-FILE FIX)
         // ==========================================
         private static IntPtr SetHook(LowLevelKeyboardProc proc)
         {
-            using (Process curProcess = Process.GetCurrentProcess())
-            using (ProcessModule curModule = curProcess.MainModule)
-            {
-                return SetWindowsHookEx(WH_KEYBOARD_LL, proc, GetModuleHandle(curModule.ModuleName), 0);
-            }
+            // PublishSingleFile=true এর জন্য এটি সবচেয়ে সেইফ পদ্ধতি। 
+            IntPtr hInstance = Marshal.GetHINSTANCE(typeof(MainWindow).Module);
+            return SetWindowsHookEx(WH_KEYBOARD_LL, proc, hInstance, 0);
         }
 
         private static IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
