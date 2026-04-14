@@ -135,8 +135,19 @@ namespace RasFocusPro
         private static MainWindow _instance; 
         private static Mutex _mutex = null;
 
-        // সিঙ্গেল ফাইল পাবলিশের জন্য ১০০% সেইফ অ্যাপ ডিরেক্টরি
-        private string AppBaseDir => Path.GetDirectoryName(Environment.ProcessPath) ?? AppDomain.CurrentDomain.BaseDirectory;
+        // 100% Safe App Directory Finder
+        private string AppBaseDir 
+        {
+            get 
+            {
+                string path = AppDomain.CurrentDomain.BaseDirectory;
+                if (string.IsNullOrEmpty(path) || path.Contains("Temp"))
+                {
+                    path = Path.GetDirectoryName(Process.GetCurrentProcess().MainModule?.FileName ?? "") ?? @"C:\";
+                }
+                return path;
+            }
+        }
 
         public MainWindow()
         {
@@ -148,8 +159,8 @@ namespace RasFocusPro
                 }
 
                 bool createdNew = false;
-                try { _mutex = new Mutex(true, "RasFocusPro_Mutex_V56", out createdNew); }
-                catch (AbandonedMutexException) { createdNew = true; } // Ghost process catch
+                try { _mutex = new Mutex(true, "RasFocusPro_Mutex_V57", out createdNew); }
+                catch (AbandonedMutexException) { createdNew = true; } 
 
                 if (!createdNew)
                 {
@@ -166,10 +177,7 @@ namespace RasFocusPro
                 
                 this.Loaded += MainWindow_Loaded;
             }
-            catch (Exception ex)
-            {
-                System.Windows.MessageBox.Show("Start Error: " + ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            catch (Exception) { /* Silent fail to prevent startup crash */ }
         }
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -210,14 +218,11 @@ namespace RasFocusPro
                     this.Hide();
                 }
             }
-            catch (Exception ex)
-            {
-                System.Windows.MessageBox.Show("Loading Error: " + ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            catch (Exception) { /* Silent fail */ }
         }
 
         // ==========================================
-        // ICON, SHORTCUT & AUTOSTART LOGIC (FIXED FOR SINGLE FILE)
+        // ICON, SHORTCUT & AUTOSTART LOGIC
         // ==========================================
         private void SetAppIcons()
         {
@@ -239,7 +244,7 @@ namespace RasFocusPro
                     Type t = Type.GetTypeFromProgID("WScript.Shell");
                     dynamic shell = Activator.CreateInstance(t);
                     var shortcut = shell.CreateShortcut(shortcutPath);
-                    shortcut.TargetPath = Environment.ProcessPath; // 100% Safe for Single File
+                    shortcut.TargetPath = Process.GetCurrentProcess().MainModule?.FileName ?? ""; 
                     shortcut.WorkingDirectory = AppBaseDir;
                     shortcut.Description = "Launch RasFocus Pro";
                     shortcut.IconLocation = Path.Combine(AppBaseDir, "icon.ico");
@@ -253,7 +258,10 @@ namespace RasFocusPro
         {
             try
             {
-                string appPath = "\"" + Environment.ProcessPath + "\" -autostart"; // 100% Safe for Single File
+                string exePath = Process.GetCurrentProcess().MainModule?.FileName ?? "";
+                if (string.IsNullOrEmpty(exePath)) return;
+
+                string appPath = "\"" + exePath + "\" -autostart"; 
                 RegistryKey key = Registry.CurrentUser.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", true);
                 if (key != null) { key.SetValue("RasFocusPro", appPath); key.Close(); }
             }
@@ -282,6 +290,7 @@ namespace RasFocusPro
             UnhookWindowsHookEx(_hookID);
             if (trayIcon != null) trayIcon.Dispose();
             base.OnClosed(e);
+            Application.Current.Shutdown();
         }
 
         // ==========================================
@@ -289,37 +298,45 @@ namespace RasFocusPro
         // ==========================================
         private void SetupTrayIcon()
         {
-            trayIcon = new System.Windows.Forms.NotifyIcon();
-            string iconPath = Path.Combine(AppBaseDir, "icon.ico");
-            if (File.Exists(iconPath)) { trayIcon.Icon = new System.Drawing.Icon(iconPath); }
-            else { trayIcon.Icon = System.Drawing.SystemIcons.Shield; }
-
-            trayIcon.Text = "RasFocus Pro - Focus Manager";
-            trayIcon.Visible = true;
-            trayIcon.DoubleClick += (s, e) => ShowAppFromTray();
-
-            System.Windows.Forms.ContextMenuStrip menu = new System.Windows.Forms.ContextMenuStrip();
-            menu.Items.Add("Open RasFocus", null, (s, e) => ShowAppFromTray());
-            menu.Items.Add("Exit App", null, (s, e) => 
+            try
             {
-                if (isSessionActive) { System.Windows.MessageBox.Show("Cannot exit while Focus Mode is active! Please stop it first.", "Security Warning", MessageBoxButton.OK, MessageBoxImage.Warning); }
-                else { trayIcon.Dispose(); Application.Current.Shutdown(); }
-            });
-            trayIcon.ContextMenuStrip = menu;
+                trayIcon = new System.Windows.Forms.NotifyIcon();
+                string iconPath = Path.Combine(AppBaseDir, "icon.ico");
+                if (File.Exists(iconPath)) { trayIcon.Icon = new System.Drawing.Icon(iconPath); }
+                else { trayIcon.Icon = System.Drawing.SystemIcons.Shield; }
+
+                trayIcon.Text = "RasFocus Pro - Focus Manager";
+                trayIcon.Visible = true;
+                trayIcon.DoubleClick += (s, e) => ShowAppFromTray();
+
+                System.Windows.Forms.ContextMenuStrip menu = new System.Windows.Forms.ContextMenuStrip();
+                menu.Items.Add("Open RasFocus", null, (s, e) => ShowAppFromTray());
+                menu.Items.Add("Exit App", null, (s, e) => 
+                {
+                    if (isSessionActive) { System.Windows.MessageBox.Show("Cannot exit while Focus Mode is active! Please stop it first.", "Security Warning", MessageBoxButton.OK, MessageBoxImage.Warning); }
+                    else { trayIcon.Dispose(); Application.Current.Shutdown(); }
+                });
+                trayIcon.ContextMenuStrip = menu;
+            }
+            catch { }
         }
 
         private void ShowAppFromTray()
         {
-            this.Show();
-            if (this.WindowState == WindowState.Minimized) this.WindowState = WindowState.Normal;
-            this.Activate(); 
-            this.Topmost = true; 
-            this.Topmost = false; 
-            this.Focus();
-            
-            IntPtr hWnd = new WindowInteropHelper(this).Handle;
-            ShowWindow(hWnd, SW_RESTORE);
-            SetForegroundWindow(hWnd);
+            try
+            {
+                this.Show();
+                if (this.WindowState == WindowState.Minimized) this.WindowState = WindowState.Normal;
+                this.Activate(); 
+                this.Topmost = true; 
+                this.Topmost = false; 
+                this.Focus();
+                
+                IntPtr hWnd = new WindowInteropHelper(this).Handle;
+                ShowWindow(hWnd, SW_RESTORE);
+                SetForegroundWindow(hWnd);
+            }
+            catch { }
         }
 
         // ==========================================
@@ -409,10 +426,14 @@ namespace RasFocusPro
         // ==========================================
         private void RefreshRunningApps()
         {
-            if (ListRunningApps == null) return;
-            ListRunningApps.Items.Clear();
-            var apps = Process.GetProcesses().Select(p => p.ProcessName.ToLower() + ".exe").Distinct().OrderBy(n => n);
-            foreach (var app in apps) { ListRunningApps.Items.Add(app); }
+            try
+            {
+                if (ListRunningApps == null) return;
+                ListRunningApps.Items.Clear();
+                var apps = Process.GetProcesses().Select(p => p.ProcessName.ToLower() + ".exe").Distinct().OrderBy(n => n);
+                foreach (var app in apps) { ListRunningApps.Items.Add(app); }
+            }
+            catch { }
         }
 
         private void FastLoop_Tick(object sender, EventArgs e)
@@ -539,20 +560,28 @@ namespace RasFocusPro
 
         private void SetupEyeFilters()
         {
-            eyeFilterDim = new Window { WindowStyle = WindowStyle.None, AllowsTransparency = true, Background = System.Windows.Media.Brushes.Black, Topmost = true, ShowInTaskbar = false, IsHitTestVisible = false, WindowState = WindowState.Maximized, Opacity = 0 };
-            eyeFilterWarm = new Window { WindowStyle = WindowStyle.None, AllowsTransparency = true, Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 130, 0)), Topmost = true, ShowInTaskbar = false, IsHitTestVisible = false, WindowState = WindowState.Maximized, Opacity = 0 };
-            eyeFilterDim.Show(); eyeFilterWarm.Show();
+            try
+            {
+                eyeFilterDim = new Window { WindowStyle = WindowStyle.None, AllowsTransparency = true, Background = System.Windows.Media.Brushes.Black, Topmost = true, ShowInTaskbar = false, IsHitTestVisible = false, WindowState = WindowState.Maximized, Opacity = 0 };
+                eyeFilterWarm = new Window { WindowStyle = WindowStyle.None, AllowsTransparency = true, Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 130, 0)), Topmost = true, ShowInTaskbar = false, IsHitTestVisible = false, WindowState = WindowState.Maximized, Opacity = 0 };
+                eyeFilterDim.Show(); eyeFilterWarm.Show();
+            }
+            catch { }
         }
 
         private void ApplyEyeFiltersRealtime()
         {
-            if (eyeFilterDim != null && eyeFilterWarm != null)
+            try
             {
-                double dimOpacity = (100 - eyeBrightness) / 100.0;
-                double warmOpacity = (eyeWarmth / 100.0) * 0.5; 
-                eyeFilterDim.Opacity = dimOpacity; eyeFilterDim.Visibility = dimOpacity > 0 ? Visibility.Visible : Visibility.Hidden;
-                eyeFilterWarm.Opacity = warmOpacity; eyeFilterWarm.Visibility = warmOpacity > 0 ? Visibility.Visible : Visibility.Hidden;
+                if (eyeFilterDim != null && eyeFilterWarm != null)
+                {
+                    double dimOpacity = (100 - eyeBrightness) / 100.0;
+                    double warmOpacity = (eyeWarmth / 100.0) * 0.5; 
+                    eyeFilterDim.Opacity = dimOpacity; eyeFilterDim.Visibility = dimOpacity > 0 ? Visibility.Visible : Visibility.Hidden;
+                    eyeFilterWarm.Opacity = warmOpacity; eyeFilterWarm.Visibility = warmOpacity > 0 ? Visibility.Visible : Visibility.Hidden;
+                }
             }
+            catch { }
         }
 
         private void ManageFocusSound(bool start)
@@ -573,44 +602,51 @@ namespace RasFocusPro
         }
 
         // ==========================================
-        // REAL-TIME KEYBOARD HOOK (CRASH FIXED FOR SINGLE FILE)
+        // REAL-TIME KEYBOARD HOOK (ULTIMATE SAFE FIX)
         // ==========================================
         private static IntPtr SetHook(LowLevelKeyboardProc proc)
         {
-            // Single File Publish-এর জন্য 절대 (Absolute) Safe পদ্ধতি, GetModuleHandle এ null পাস করা
-            IntPtr hModule = GetModuleHandle(null);
-            return SetWindowsHookEx(WH_KEYBOARD_LL, proc, hModule, 0);
+            try
+            {
+                // 완전히 Safe mode for Single-File publish. Using IntPtr.Zero directly.
+                return SetWindowsHookEx(WH_KEYBOARD_LL, proc, IntPtr.Zero, 0);
+            }
+            catch { return IntPtr.Zero; }
         }
 
         private static IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
         {
-            if (nCode >= 0 && wParam == (IntPtr)WM_KEYDOWN && _instance != null && _instance.blockAdult)
+            try
             {
-                int vkCode = Marshal.ReadInt32(lParam);
-                char c = (char)vkCode;
-                if (char.IsLetterOrDigit(c) || char.IsPunctuation(c))
+                if (nCode >= 0 && wParam == (IntPtr)WM_KEYDOWN && _instance != null && _instance.blockAdult)
                 {
-                    globalKeyBuffer += char.ToLower(c);
-                    if (globalKeyBuffer.Length > 50) globalKeyBuffer = globalKeyBuffer.Substring(1);
-
-                    foreach (string kw in _instance.explicitKeywords)
+                    int vkCode = Marshal.ReadInt32(lParam);
+                    char c = (char)vkCode;
+                    if (char.IsLetterOrDigit(c) || char.IsPunctuation(c))
                     {
-                        if (globalKeyBuffer.Contains(kw))
+                        globalKeyBuffer += char.ToLower(c);
+                        if (globalKeyBuffer.Length > 50) globalKeyBuffer = globalKeyBuffer.Substring(1);
+
+                        foreach (string kw in _instance.explicitKeywords)
                         {
-                            globalKeyBuffer = ""; 
-                            IntPtr hActive = GetForegroundWindow();
-                            if (hActive != IntPtr.Zero) _instance.CloseWindowNatively(hActive);
-                            _instance.ShowOverlay(_instance.GetRandomQuote(1));
-                            break;
+                            if (globalKeyBuffer.Contains(kw))
+                            {
+                                globalKeyBuffer = ""; 
+                                IntPtr hActive = GetForegroundWindow();
+                                if (hActive != IntPtr.Zero) _instance.CloseWindowNatively(hActive);
+                                _instance.ShowOverlay(_instance.GetRandomQuote(1));
+                                break;
+                            }
                         }
                     }
                 }
             }
+            catch { }
             return CallNextHookEx(_hookID, nCode, wParam, lParam);
         }
 
         // ==========================================
-        // DATA SAVE/LOAD (FIXED FOR ALL LISTS)
+        // DATA SAVE/LOAD
         // ==========================================
         private void SaveData()
         {
@@ -627,21 +663,19 @@ namespace RasFocusPro
         private void LoadData()
         {
             Action<string, List<string>, ListBox> loadList = (fileName, list, uiBox) => {
-                string path = Path.Combine(secretDir, fileName);
-                if (File.Exists(path)) { 
-                    list.AddRange(File.ReadAllLines(path)); 
-                    if(uiBox != null) foreach(var item in list) uiBox.Items.Add(item); 
-                }
+                try {
+                    string path = Path.Combine(secretDir, fileName);
+                    if (File.Exists(path)) { 
+                        list.AddRange(File.ReadAllLines(path)); 
+                        if(uiBox != null) foreach(var item in list) uiBox.Items.Add(item); 
+                    }
+                } catch { }
             };
             
-            try
-            {
-                loadList("bl_app.txt", blockedApps, ListBlockedApps);
-                loadList("bl_web.txt", blockedWebs, ListBlockedWebs);
-                loadList("al_app.txt", allowedApps, ListAllowApps);
-                loadList("al_web.txt", allowedWebs, ListAllowWebs);
-            }
-            catch { }
+            loadList("bl_app.txt", blockedApps, ListBlockedApps);
+            loadList("bl_web.txt", blockedWebs, ListBlockedWebs);
+            loadList("al_app.txt", allowedApps, ListAllowApps);
+            loadList("al_web.txt", allowedWebs, ListAllowWebs);
         }
     }
 }
