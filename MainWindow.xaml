@@ -1,307 +1,506 @@
-<Window x:Class="RasFocusPro.MainWindow"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="RasFocus Pro" Height="720" Width="1100"
-        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
-        WindowStartupLocation="CenterScreen" MouseLeftButtonDown="Window_MouseLeftButtonDown"
-        TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType">
+#pragma warning disable CS8600, CS8602, CS8604, CS8618, CS8622, CS8625, CS0414
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Net.Http;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Interop;
+using System.Windows.Media;
+using System.Windows.Threading;
 
-    <Window.Resources>
-        <SolidColorBrush x:Key="PrimaryTeal" Color="#14B8C8"/>
-        <SolidColorBrush x:Key="DarkText" Color="#333333"/>
-        <SolidColorBrush x:Key="LightBg" Color="#FFFFFF"/>
+// System Tray এর জন্য
+using WinForms = System.Windows.Forms;
+using System.Drawing;
 
-        <Style TargetType="TextBox">
-            <Setter Property="Background" Value="{StaticResource LightBg}"/>
-            <Setter Property="Foreground" Value="{StaticResource DarkText}"/>
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="Padding" Value="8,6"/>
-            <Setter Property="BorderBrush" Value="#CBD5E1"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="TextBox">
-                        <Border CornerRadius="4" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}">
-                            <ScrollViewer x:Name="PART_ContentHost" Margin="0"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter Property="BorderBrush" Value="{StaticResource PrimaryTeal}"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
+namespace RasFocusPro
+{
+    public partial class MainWindow : Window
+    {
+        // ==========================================
+        // 1. WINDOWS NATIVE API (P/Invoke)
+        // ==========================================
+        [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
+        [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool SetForegroundWindow(IntPtr hWnd);
+        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)] private static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)] private static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
+        [DllImport("user32.dll", SetLastError = true)] static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+        [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+        [DllImport("winmm.dll")] private static extern long mciSendString(string strCommand, StringBuilder strReturn, int iReturnLength, IntPtr hwndCallback);
+        [DllImport("user32.dll")] private static extern IntPtr SetWindowsHookEx(int idHook, LowLevelKeyboardProc lpfn, IntPtr hMod, uint dwThreadId);
+        [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool UnhookWindowsHookEx(IntPtr hhk);
+        [DllImport("user32.dll")] private static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
+        [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)] private static extern IntPtr GetModuleHandle(string lpModuleName);
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)] static extern uint RegisterWindowMessage(string lpString);
+        [DllImport("user32.dll")] static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
 
-        <Style TargetType="Button" x:Key="CareBtn">
-            <Setter Property="Background" Value="{StaticResource PrimaryTeal}"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" CornerRadius="6" Padding="12,6">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Opacity" Value="0.85"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
+        private const int SW_MINIMIZE = 6;
+        private const int WH_KEYBOARD_LL = 13;
+        private const int WM_KEYDOWN = 0x0100;
+        private const byte VK_CONTROL = 0x11;
+        private const uint KEYEVENTF_KEYUP = 0x0002;
+        private const int HWND_BROADCAST = 0xffff;
 
-        <Style TargetType="CheckBox" x:Key="ToggleSwitch">
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="CheckBox">
-                        <StackPanel Orientation="Horizontal">
-                            <Grid Width="40" Height="20">
-                                <Border x:Name="BgBorder" CornerRadius="10" Background="#D1D5DB"/>
-                                <Ellipse x:Name="Thumb" Fill="White" Width="16" Height="16" HorizontalAlignment="Left" Margin="2">
-                                    <Ellipse.Effect>
-                                        <DropShadowEffect BlurRadius="4" ShadowDepth="1" Opacity="0.2"/>
-                                    </Ellipse.Effect>
-                                </Ellipse>
-                            </Grid>
-                            <ContentPresenter Margin="8,0,0,0" VerticalAlignment="Center" TextBlock.FontSize="13" TextBlock.Foreground="{StaticResource DarkText}"/>
-                        </StackPanel>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="BgBorder" Property="Background" Value="{StaticResource PrimaryTeal}"/>
-                                <Setter TargetName="Thumb" Property="HorizontalAlignment" Value="Right"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-    </Window.Resources>
+        private static uint WM_WAKEUP = RegisterWindowMessage("RasFocusPro_Wakeup");
 
-    <Border Background="#F8FAFC" CornerRadius="10" Margin="15">
-        <Border.Effect>
-            <DropShadowEffect BlurRadius="15" ShadowDepth="3" Opacity="0.2" Color="Black"/>
-        </Border.Effect>
+        // ==========================================
+        // 2. GLOBALS, LISTS & BAD WORDS (From C++)
+        // ==========================================
+        private DispatcherTimer fastTimer, slowTimer, syncTimer, licenseTimer;
+        private bool isSessionActive = false, isTimeMode = false, isPassMode = false, useAllowMode = false;
+        private bool blockReels = false, blockShorts = false, isAdblockActive = false, blockAdult = true;
+        private bool isPomodoroMode = false, isPomodoroBreak = false, isTrialExpired = false, isLicenseValid = false;
+        
+        private int focusTimeTotalSeconds = 0, timerTicks = 0, pomoTicks = 0;
+        private int pomoLengthMin = 25, pomoTotalSessions = 4, pomoCurrentSession = 1;
+        private int eyeBrightness = 100, eyeWarmth = 0, trialDaysLeft = 7;
+        
+        private string currentSessionPass = "", userProfileName = "Rasel Mia";
+        private string safeAdminMsg = "", pendingAdminChatStr = "", currentBroadcastMsg = "";
+        private string secretDir;
 
-        <Grid>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="220"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
+        private List<string> blockedApps = new List<string>(), blockedWebs = new List<string>();
+        private List<string> allowedApps = new List<string>(), allowedWebs = new List<string>();
+        private string[] systemApps = { "explorer.exe", "svchost.exe", "taskmgr.exe", "cmd.exe", "conhost.exe", "csrss.exe", "dwm.exe", "lsass.exe", "services.exe", "smss.exe", "wininit.exe", "winlogon.exe", "spoolsv.exe", "fontdrvhost.exe" };
+        private string[] commonThirdPartyApps = { "chrome.exe", "msedge.exe", "firefox.exe", "brave.exe", "vlc.exe", "telegram.exe", "whatsapp.exe", "discord.exe", "zoom.exe", "winword.exe", "excel.exe", "notepad.exe" };
+        private string[] safeBrowserTitles = { "new tab", "start", "blank page", "allowed websites", "loading", "untitled", "pomodoro break" };
 
-            <Border Grid.Column="0" Background="{StaticResource PrimaryTeal}" CornerRadius="10,0,0,10">
-                <StackPanel Margin="0,20,0,0">
-                    <StackPanel Orientation="Horizontal" Margin="20,0,0,30">
-                        <TextBlock Text="👁️" FontSize="24" Foreground="White" Margin="0,0,10,0"/>
-                        <TextBlock Text="RasFocus Pro" Foreground="White" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
-                    </StackPanel>
+        // All Bad Words combined (English + Medium + Bangla)
+        private List<string> explicitKeywords = new List<string> {
+            "porn", "xxx", "sex", "nude", "nsfw", "xvideos", "pornhub", "xnxx", "xhamster", "brazzers", "onlyfans", "playboy", "mia khalifa", "bhabi", "chudai", "bangla choti", "magi", "sexy",
+            "hot video", "hot scene", "desi", "boudi", "devar", "item song", "item dance", "mujra", "belly dance", "bikini", "romance", "kissing", "ullu", "web series", "ullongo", "kapor chara", "tiktok dance", "dj dance", "hot dance", "nongra dance",
+            "খাসি", "চটি", "যৌন", "নগ্ন", "উলঙ্গ", "মেয়েদের ছবি", "গরম ভিডিও", "নষ্ট ভিডিও", "নোংরা ভিডিও", "খারাপ ছবি", "পর্ন", "যৌনতা", "meyeder chobi", "nongra video", "gorom video", "kapor chara chobi", "bangla hot", "boudi video", "deshi sexy", "biye barir dance", "পটানো", "সেক্সি নাচ", "অশ্লীল", "অশ্লীল ভিডিও", "বৌদি", "দেবর বৌদি", "ভাবি", "গোপন ভিডিও", "ভাইরাল ভিডিও"
+        };
 
-                    <ListBox x:Name="SidebarList" Background="Transparent" BorderThickness="0" Foreground="White" FontSize="15" FontWeight="SemiBold" SelectionChanged="SidebarList_SelectionChanged">
-                        <ListBox.ItemContainerStyle>
-                            <Style TargetType="ListBoxItem">
-                                <Setter Property="Padding" Value="20,15"/>
-                                <Setter Property="Cursor" Value="Hand"/>
-                                <Setter Property="Template">
-                                    <Setter.Value>
-                                        <ControlTemplate TargetType="ListBoxItem">
-                                            <Border x:Name="BorderBg" Background="Transparent">
-                                                <ContentPresenter Margin="{TemplateBinding Padding}"/>
-                                            </Border>
-                                            <ControlTemplate.Triggers>
-                                                <Trigger Property="IsSelected" Value="True">
-                                                    <Setter TargetName="BorderBg" Property="Background" Value="#F8FAFC"/>
-                                                    <Setter Property="Foreground" Value="{StaticResource PrimaryTeal}"/>
-                                                </Trigger>
-                                                <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter TargetName="BorderBg" Property="Background" Value="#17C3D4"/>
-                                                </Trigger>
-                                            </ControlTemplate.Triggers>
-                                        </ControlTemplate>
-                                    </Setter.Value>
-                                </Setter>
-                            </Style>
-                        </ListBox.ItemContainerStyle>
-                        <ListBoxItem IsSelected="True">🛡️  Focus Mode</ListBoxItem>
-                        <ListBoxItem>💻  Display / Eye Cure</ListBoxItem>
-                        <ListBoxItem>☕  Pomodoro Break</ListBoxItem>
-                        <ListBoxItem>⚙️  Settings</ListBoxItem>
-                        <ListBoxItem>💬  Live Chat</ListBoxItem>
-                        <ListBoxItem>⭐  Activate Pro</ListBoxItem>
-                    </ListBox>
-                </StackPanel>
-            </Border>
+        private string[] islamicQuotes = { 
+            "\"মুমিনদের বলুন, তারা যেন তাদের দৃষ্টি নত রাখে এবং তাদের যৌনাঙ্গর হেফাযত করে।\" - (সূরা আন-নূর: ৩০)", 
+            "\"লজ্জাশীলতা কল্যাণ ছাড়া আর কিছুই বয়ে আনে না।\" - (সহীহ বুখারী)" 
+        };
+        private string[] timeQuotes = { 
+            "\"যারা সময়কে মূল্যায়ন করে না, সময়ও তাদেরকে মূল্যায়ন করে না।\" - এ.পি.জে. আবদুল কালাম" 
+        };
 
-            <Grid Grid.Column="1">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="40"/>
-                    <RowDefinition Height="*"/>
-                </Grid.RowDefinitions>
+        private WinForms.NotifyIcon trayIcon;
+        private Window overlayWindow = null, stopwatchWnd = null, liveChatWnd = null, upgradeWnd = null;
 
-                <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="10,10,10,0">
-                    <Button Content="—" Background="Transparent" Foreground="#888" FontSize="16" BorderThickness="0" Width="30" Height="30" Cursor="Hand" Click="CloseButton_Click"/>
-                    <Button Content="✕" Background="Transparent" Foreground="#888" FontSize="16" BorderThickness="0" Width="30" Height="30" Cursor="Hand" Click="CloseButton_Click"/>
-                </StackPanel>
+        // Keyboard Hook Setup
+        private delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
+        private static LowLevelKeyboardProc _proc;
+        private static IntPtr _hookID = IntPtr.Zero;
+        private static string globalKeyBuffer = "";
+        private static MainWindow _instance; 
+        private static Mutex _mutex = null;
 
-                <StackPanel x:Name="PageFocusMode" Grid.Row="1" Margin="25,0,25,20" Visibility="Visible">
-                    
-                    <Grid Margin="0,0,0,15">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
+        // ==========================================
+        // 3. CONSTRUCTOR & INITIALIZATION
+        // ==========================================
+        public MainWindow()
+        {
+            // Single Instance Check
+            bool createdNew;
+            _mutex = new Mutex(true, "RasFocusPro_Mutex_V55", out createdNew);
+            if (!createdNew)
+            {
+                PostMessage((IntPtr)HWND_BROADCAST, WM_WAKEUP, IntPtr.Zero, IntPtr.Zero);
+                Application.Current.Shutdown();
+                return;
+            }
 
-                        <StackPanel Grid.Column="0" Orientation="Horizontal">
-                            <TextBlock Text="Profile Name:" VerticalAlignment="Center" FontSize="13" Foreground="#555" Margin="0,0,8,0"/>
-                            <TextBox x:Name="TxtProfileName" Width="120" Margin="0,0,10,0" Text="Rasel Mia"/>
-                            <Button Content="SAVE" Style="{StaticResource CareBtn}" Background="#10B981" Padding="12,4" FontSize="12" Click="BtnSave_Click"/>
-                        </StackPanel>
+            InitializeComponent();
+            _instance = this;
+            
+            secretDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RasFocusPro");
+            Directory.CreateDirectory(secretDir);
 
-                        <TextBlock Grid.Column="1" Text="TRIAL: 174 DAYS LEFT" Foreground="#F59E0B" FontWeight="Bold" FontSize="13" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+            LoadData();
+            SetupTrayIcon();
+            AutoStartSetup();
 
-                        <StackPanel Grid.Column="2" Orientation="Horizontal">
-                            <Button Content="LIVE CHAT" Style="{StaticResource CareBtn}" Background="#EC4899" Margin="0,0,10,0"/>
-                            <Button Content="UPGRADE" Style="{StaticResource CareBtn}" Background="#F59E0B"/>
-                        </StackPanel>
-                    </Grid>
+            _proc = HookCallback;
+            _hookID = SetHook(_proc);
 
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
-                        <TextBlock Text="Pass:" VerticalAlignment="Center" FontSize="13" Foreground="#555" Margin="0,0,5,0"/>
-                        <TextBox x:Name="TxtPass" Width="80" Margin="0,0,15,0"/>
+            // Timers setup
+            fastTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
+            fastTimer.Tick += FastLoop_Tick; fastTimer.Start();
 
-                        <TextBlock Text="Time (Hr:Min):" VerticalAlignment="Center" FontSize="13" Foreground="#555" Margin="0,0,5,0"/>
-                        <TextBox Width="40" Margin="0,0,5,0" Text="0"/>
-                        <TextBox Width="40" Margin="0,0,15,0" Text="0"/>
+            slowTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+            slowTimer.Tick += SlowLoop_Tick; slowTimer.Start();
 
-                        <Button Content="START" Style="{StaticResource CareBtn}" Background="#10B981" Margin="0,0,8,0" Click="BtnStart_Click"/>
-                        <Button Content="STOP" Style="{StaticResource CareBtn}" Background="#64748B" Margin="0,0,8,0" Click="BtnStop_Click"/>
-                        <Button Content="STOP WATCH" Style="{StaticResource CareBtn}" Background="#0F172A" Margin="0,0,8,0"/>
-                        <Button Content="POMODORO" Style="{StaticResource CareBtn}" Background="#EF4444" Margin="0,0,8,0"/>
-                        <Button Content="EYE CURE" Style="{StaticResource CareBtn}" Background="#8B5CF6" Margin="0,0,15,0"/>
+            syncTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(4) };
+            syncTimer.Tick += SyncLoop_Tick; syncTimer.Start();
 
-                        <TextBlock x:Name="LblStatus" Text="Ready" Foreground="#EF4444" FontWeight="Bold" VerticalAlignment="Center"/>
-                    </StackPanel>
+            licenseTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(10) };
+            licenseTimer.Tick += LicenseCheck_Tick; licenseTimer.Start();
+            
+            PopulateComboBoxes();
+        }
 
-                    <WrapPanel Margin="0,0,0,15">
-                        <RadioButton Content="Block List" IsChecked="True" Foreground="#333" FontWeight="Bold" Margin="0,0,15,0" VerticalAlignment="Center"/>
-                        <RadioButton Content="Allow List" Foreground="#333" FontWeight="Bold" Margin="0,0,25,0" VerticalAlignment="Center"/>
-                        
-                        <CheckBox Content="AD BLOCKER" Style="{StaticResource ToggleSwitch}" Margin="0,0,20,0"/>
-                        <CheckBox Content="Block FB Reels" Style="{StaticResource ToggleSwitch}" Margin="0,0,20,0"/>
-                        <CheckBox Content="Block YT Shorts" Style="{StaticResource ToggleSwitch}" Margin="0,0,0,0"/>
-                    </WrapPanel>
+        protected override void OnSourceInitialized(EventArgs e)
+        {
+            base.OnSourceInitialized(e);
+            HwndSource source = PresentationSource.FromVisual(this) as HwndSource;
+            source.AddHook(WndProc);
+        }
 
-                    <Grid Height="390">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="1*"/>
-                            <ColumnDefinition Width="10"/>
-                            <ColumnDefinition Width="1*"/>
-                            <ColumnDefinition Width="10"/>
-                            <ColumnDefinition Width="1*"/>
-                        </Grid.ColumnDefinitions>
+        private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            if (msg == WM_WAKEUP) { ShowAppFromTray(); handled = true; }
+            return IntPtr.Zero;
+        }
 
-                        <Border Grid.Column="0" Background="White" CornerRadius="6" BorderBrush="#E2E8F0" BorderThickness="1" Padding="10">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="*"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="*"/>
-                                    <RowDefinition Height="Auto"/>
-                                </Grid.RowDefinitions>
-                                
-                                <TextBlock Grid.Row="0" Text="Block Apps (vlc.exe)" FontSize="12" Foreground="#555" Margin="0,0,0,5"/>
-                                <Grid Grid.Row="1" Margin="0,0,0,10">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBox Grid.Column="0" x:Name="TxtAppBlock" Margin="0,0,5,0"/>
-                                    <Button Grid.Column="1" Content="ADD" Style="{StaticResource CareBtn}" Background="#2563EB" Padding="10,2" FontSize="12"/>
-                                    <ListBox Grid.Column="0" Grid.ColumnSpan="2" Margin="0,35,0,0" BorderBrush="#CBD5E1"/>
-                                </Grid>
+        protected override void OnClosed(EventArgs e)
+        {
+            UnhookWindowsHookEx(_hookID);
+            if (trayIcon != null) trayIcon.Dispose();
+            base.OnClosed(e);
+        }
 
-                                <TextBlock Grid.Row="2" Text="Block Websites" FontSize="12" Foreground="#555" Margin="0,0,0,5"/>
-                                <Grid Grid.Row="3" Margin="0,0,0,10">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBox Grid.Column="0" x:Name="TxtWebBlock" Margin="0,0,5,0"/>
-                                    <Button Grid.Column="1" Content="ADD" Style="{StaticResource CareBtn}" Background="#2563EB" Padding="10,2" FontSize="12"/>
-                                    <ListBox Grid.Column="0" Grid.ColumnSpan="2" Margin="0,35,0,0" BorderBrush="#CBD5E1"/>
-                                </Grid>
+        // ==========================================
+        // 4. SYSTEM TRAY & AUTOSTART
+        // ==========================================
+        private void SetupTrayIcon()
+        {
+            trayIcon = new WinForms.NotifyIcon();
+            string iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "icon.ico");
+            trayIcon.Icon = File.Exists(iconPath) ? new System.Drawing.Icon(iconPath) : System.Drawing.SystemIcons.Shield;
+            trayIcon.Text = "RasFocus Pro - Focus Manager";
+            trayIcon.Visible = true;
+            trayIcon.DoubleClick += (s, e) => ShowAppFromTray();
 
-                                <Button Grid.Row="4" Content="Remove" Style="{StaticResource CareBtn}" Background="#2563EB" Padding="5"/>
-                            </Grid>
-                        </Border>
+            WinForms.ContextMenuStrip menu = new WinForms.ContextMenuStrip();
+            menu.Items.Add("Open RasFocus", null, (s, e) => ShowAppFromTray());
+            menu.Items.Add("Exit App", null, (s, e) => 
+            {
+                if (isSessionActive) { MessageBox.Show("Cannot exit while Focus Mode is active! Please stop it first.", "Security Warning", MessageBoxButton.OK, MessageBoxImage.Warning); }
+                else { trayIcon.Dispose(); Application.Current.Shutdown(); }
+            });
+            trayIcon.ContextMenuStrip = menu;
+        }
 
-                        <Border Grid.Column="2" Background="White" CornerRadius="6" BorderBrush="#E2E8F0" BorderThickness="1" Padding="10">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="*"/>
-                                </Grid.RowDefinitions>
-                                <TextBlock Grid.Row="0" Text="Running Apps (Auto-Detect)" FontSize="12" Foreground="#555" Margin="0,0,0,5"/>
-                                <Button Grid.Row="1" Content="Add Selected App to List" Style="{StaticResource CareBtn}" Background="#2563EB" Padding="5" Margin="0,0,0,10"/>
-                                <ListBox Grid.Row="2" x:Name="ListRunningApps" BorderBrush="#CBD5E1"/>
-                            </Grid>
-                        </Border>
+        private void ShowAppFromTray()
+        {
+            this.Show();
+            this.WindowState = WindowState.Normal;
+            this.Activate(); 
+            this.Topmost = true; this.Topmost = false; 
+            this.Focus();
+        }
 
-                        <Border Grid.Column="4" Background="White" CornerRadius="6" BorderBrush="#E2E8F0" BorderThickness="1" Padding="10">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="*"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="*"/>
-                                    <RowDefinition Height="Auto"/>
-                                </Grid.RowDefinitions>
-                                
-                                <TextBlock Grid.Row="0" Text="Allow Apps (code.exe)" FontSize="12" Foreground="#555" Margin="0,0,0,5"/>
-                                <Grid Grid.Row="1" Margin="0,0,0,10">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBox Grid.Column="0" x:Name="TxtAppAllow" Margin="0,0,5,0"/>
-                                    <Button Grid.Column="1" Content="ADD" Style="{StaticResource CareBtn}" Background="#2563EB" Padding="10,2" FontSize="12"/>
-                                    <ListBox Grid.Column="0" Grid.ColumnSpan="2" Margin="0,35,0,0" BorderBrush="#CBD5E1"/>
-                                </Grid>
+        private void AutoStartSetup()
+        {
+            try {
+                using (Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", true))
+                {
+                    string path = "\"" + Process.GetCurrentProcess().MainModule.FileName + "\" -autostart";
+                    key.SetValue("RasFocusPro", path);
+                }
+            } catch { }
+        }
 
-                                <TextBlock Grid.Row="2" Text="Allow Webs" FontSize="12" Foreground="#555" Margin="0,0,0,5"/>
-                                <Grid Grid.Row="3" Margin="0,0,0,10">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBox Grid.Column="0" x:Name="TxtWebAllow" Margin="0,0,5,0"/>
-                                    <Button Grid.Column="1" Content="ADD" Style="{StaticResource CareBtn}" Background="#2563EB" Padding="10,2" FontSize="12"/>
-                                    <ListBox Grid.Column="0" Grid.ColumnSpan="2" Margin="0,35,0,0" BorderBrush="#CBD5E1"/>
-                                </Grid>
+        // ==========================================
+        // 5. UI EVENT HANDLERS (WPF Controls)
+        // ==========================================
+        private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) { DragMove(); }
+        
+        private void CloseButton_Click(object sender, RoutedEventArgs e) 
+        { 
+            this.Hide(); 
+            trayIcon.ShowBalloonTip(2000, "RasFocus Pro", "Running securely in the background...", WinForms.ToolTipIcon.Info);
+        }
+        
+        private void MinimizeButton_Click(object sender, RoutedEventArgs e) { this.WindowState = WindowState.Minimized; }
 
-                                <Button Grid.Row="4" Content="Remove" Style="{StaticResource CareBtn}" Background="#2563EB" Padding="5"/>
-                            </Grid>
-                        </Border>
-                    </Grid>
-                </StackPanel>
+        // Sidebar Actions
+        private void SidebarList_SelectionChanged(object sender, SelectionChangedEventArgs e) {
+            // Optional routing if you have multiple pages in your XAML
+        }
 
-                <StackPanel x:Name="PageEyeCure" Grid.Row="1" Margin="40,20,40,40" Visibility="Collapsed">
-                    <TextBlock Text="Display Settings" FontSize="24" FontWeight="Bold" Foreground="{StaticResource PrimaryTeal}"/>
-                </StackPanel>
+        // Core Buttons
+        private void BtnStart_Click(object sender, RoutedEventArgs e)
+        {
+            if (isSessionActive) return;
+            
+            // Get values from XAML if available, else defaults
+            string pass = FindTextBoxValue("TxtPass");
+            string hr = FindTextBoxValue("TxtTimeHr");
+            string min = FindTextBoxValue("TxtTimeMin");
+
+            focusTimeTotalSeconds = (int.TryParse(hr, out int h) ? h * 3600 : 0) + (int.TryParse(min, out int m) ? m * 60 : 0);
+            
+            if (!string.IsNullOrEmpty(pass) || focusTimeTotalSeconds > 0)
+            {
+                isPassMode = !string.IsNullOrEmpty(pass);
+                if (isPassMode) currentSessionPass = pass;
+                isTimeMode = (focusTimeTotalSeconds > 0);
+                isSessionActive = true;
+                timerTicks = 0;
                 
-                <StackPanel x:Name="PagePomodoro" Grid.Row="1" Margin="40,20,40,40" Visibility="Collapsed">
-                    <TextBlock Text="Pomodoro Timer" FontSize="24" FontWeight="Bold" Foreground="{StaticResource PrimaryTeal}"/>
-                </StackPanel>
+                SaveData();
+                UpdateUIStates();
+                ManageFocusSound(true);
+                if (isPassMode) SyncToFirebase("livePassword", currentSessionPass);
+                
+                MessageBox.Show("Focus Mode Started! Unauthorized apps are now blocked.", "Security Active", MessageBoxButton.OK, MessageBoxImage.Information);
+                this.Hide(); 
+            }
+            else { MessageBox.Show("Set a password or timer to start Focus Mode.", "Warning", MessageBoxButton.OK, MessageBoxImage.Warning); }
+        }
 
-            </Grid>
-        </Grid>
-    </Border>
-</Window>
+        private void BtnStop_Click(object sender, RoutedEventArgs e)
+        {
+            if (!isSessionActive) return;
+
+            string enteredPass = FindTextBoxValue("TxtPass");
+            if (isPassMode)
+            {
+                if (enteredPass == currentSessionPass) {
+                    ClearSessionData();
+                    SyncToFirebase("livePassword", "");
+                    MessageBox.Show("Focus Session Stopped.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                } else { MessageBox.Show("Wrong Password!", "Error", MessageBoxButton.OK, MessageBoxImage.Error); }
+            }
+            else if (isTimeMode) { MessageBox.Show("Timer active! You must wait until time is over.", "Locked", MessageBoxButton.OK, MessageBoxImage.Warning); }
+            else if (isPomodoroMode) { ClearSessionData(); MessageBox.Show("Pomodoro Stopped.", "Success", MessageBoxButton.OK, MessageBoxImage.Information); }
+        }
+
+        private void BtnPomodoro_Click(object sender, RoutedEventArgs e) { CreatePomodoroSetupWindow(); }
+        private void BtnStopWatch_Click(object sender, RoutedEventArgs e) { CreateStopwatchWindow(); }
+        private void BtnLiveChat_Click(object sender, RoutedEventArgs e) { CreateLiveChatWindow(); }
+        private void BtnUpgrade_Click(object sender, RoutedEventArgs e) { CreateUpgradeWindow(); }
+        
+        // List Management
+        private void BtnAddApp_Click(object sender, RoutedEventArgs e) { AddToList(blockedApps, "TxtAppBlock", "ListBlockedApps"); }
+        private void BtnRemApp_Click(object sender, RoutedEventArgs e) { RemoveFromList(blockedApps, "ListBlockedApps"); }
+        private void BtnAddWeb_Click(object sender, RoutedEventArgs e) { AddToList(blockedWebs, "TxtWebBlock", "ListBlockedWebs"); }
+        private void BtnRemWeb_Click(object sender, RoutedEventArgs e) { RemoveFromList(blockedWebs, "ListBlockedWebs"); }
+
+        private void AddToList(List<string> list, string txtBoxName, string listName) {
+            string val = FindTextBoxValue(txtBoxName).ToLower().Trim();
+            if (!string.IsNullOrEmpty(val)) {
+                if (txtBoxName.Contains("App") && !val.EndsWith(".exe")) val += ".exe";
+                if (!list.Contains(val)) { list.Add(val); SaveData(); RefreshUILists(); }
+            }
+        }
+        
+        private void RemoveFromList(List<string> list, string listName) {
+            ListBox lb = this.FindName(listName) as ListBox;
+            if (lb != null && lb.SelectedItem != null) {
+                list.Remove(lb.SelectedItem.ToString());
+                SaveData(); RefreshUILists();
+            }
+        }
+
+        // ==========================================
+        // 6. THE ENFORCER (Background Logic)
+        // ==========================================
+        private void FastLoop_Tick(object sender, EventArgs e)
+        {
+            if (!blockAdult && !blockReels && !blockShorts && !isSessionActive) return;
+            if (overlayWindow != null && overlayWindow.IsVisible) return;
+
+            IntPtr hWnd = GetForegroundWindow();
+            if (hWnd != IntPtr.Zero)
+            {
+                StringBuilder title = new StringBuilder(512);
+                GetWindowText(hWnd, title, 512);
+                string sTitle = title.ToString().ToLower();
+
+                // Adult Blocks
+                if (blockAdult && explicitKeywords.Any(k => sTitle.Contains(k))) { CloseWindowNatively(hWnd); ShowOverlay(GetRandomQuote(1)); return; }
+
+                // Social Blocks
+                if (blockReels && sTitle.Contains("facebook") && sTitle.Contains("reels")) { CloseWindowNatively(hWnd); ShowOverlay(GetRandomQuote(2)); return; }
+                if (blockShorts && sTitle.Contains("youtube") && sTitle.Contains("shorts")) { CloseWindowNatively(hWnd); ShowOverlay(GetRandomQuote(2)); return; }
+
+                // Focus Web Block
+                if (isSessionActive)
+                {
+                    bool isBrowser = sTitle.Contains("chrome") || sTitle.Contains("edge") || sTitle.Contains("firefox") || sTitle.Contains("brave");
+                    if (isBrowser) {
+                        if (useAllowMode) {
+                            if (!allowedWebs.Any(w => sTitle.Contains(w.ToLower())) && !safeBrowserTitles.Any(s => sTitle.Contains(s)))
+                            { CloseWindowNatively(hWnd); ShowOverlay("Website not in Allow List!"); }
+                        } else {
+                            if (blockedWebs.Any(w => sTitle.Contains(w.ToLower())))
+                            { CloseWindowNatively(hWnd); ShowOverlay("Website Blocked by Focus Mode!"); }
+                        }
+                    }
+                }
+            }
+        }
+
+        private void SlowLoop_Tick(object sender, EventArgs e)
+        {
+            if (!isSessionActive) return;
+
+            // Time Managers
+            if (isPomodoroMode)
+            {
+                pomoTicks++;
+                int totalMins = isPomodoroBreak ? 5 : pomoLengthMin;
+                int left = (totalMins * 60) - pomoTicks;
+                if (!isPomodoroBreak && pomoTicks >= pomoLengthMin * 60) { isPomodoroBreak = true; pomoTicks = 0; ShowOverlay("☕ Time to Rest! Break Started."); }
+                else if (isPomodoroBreak && pomoTicks >= 5 * 60) { 
+                    isPomodoroBreak = false; pomoTicks = 0; pomoCurrentSession++;
+                    if(pomoCurrentSession > pomoTotalSessions) { ClearSessionData(); MessageBox.Show("All Pomodoro Sessions Completed!", "Success"); }
+                }
+            }
+            else if (isTimeMode && focusTimeTotalSeconds > 0)
+            {
+                timerTicks++;
+                if(timerTicks >= focusTimeTotalSeconds) { ClearSessionData(); MessageBox.Show("Focus time is over!", "Success"); }
+            }
+
+            // Process Killer
+            foreach (Process p in Process.GetProcesses())
+            {
+                try {
+                    string pName = p.ProcessName.ToLower() + ".exe";
+                    if (pName == "taskmgr.exe" || pName == "msiexec.exe") { p.Kill(); continue; } 
+
+                    if (useAllowMode) { if (!systemApps.Contains(pName) && !allowedApps.Contains(pName)) p.Kill(); }
+                    else { if (blockedApps.Contains(pName)) p.Kill(); }
+                } catch { }
+            }
+        }
+
+        // ==========================================
+        // 7. TYPING BLOCKER (Real-Time Hook)
+        // ==========================================
+        private static IntPtr SetHook(LowLevelKeyboardProc proc) {
+            using (Process curProcess = Process.GetCurrentProcess())
+            using (ProcessModule curModule = curProcess.MainModule)
+                return SetWindowsHookEx(WH_KEYBOARD_LL, proc, GetModuleHandle(curModule.ModuleName), 0);
+        }
+
+        private static IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam) {
+            if (nCode >= 0 && wParam == (IntPtr)WM_KEYDOWN && _instance != null && _instance.blockAdult) {
+                int vkCode = Marshal.ReadInt32(lParam);
+                globalKeyBuffer += ((char)vkCode).ToString().ToLower();
+                if (globalKeyBuffer.Length > 50) globalKeyBuffer = globalKeyBuffer.Substring(1);
+
+                if (_instance.explicitKeywords.Any(k => globalKeyBuffer.Contains(k))) {
+                    globalKeyBuffer = ""; 
+                    IntPtr hActive = GetForegroundWindow();
+                    if (hActive != IntPtr.Zero) _instance.CloseWindowNatively(hActive);
+                    _instance.ShowOverlay(_instance.GetRandomQuote(1));
+                }
+            }
+            return CallNextHookEx(_hookID, nCode, wParam, lParam);
+        }
+
+        // ==========================================
+        // 8. FIREBASE SYNC (PowerShell) & UTILS
+        // ==========================================
+        private string GetDeviceID() { return Environment.MachineName; }
+
+        private void SyncToFirebase(string field, string value, bool isString = true) {
+            string url = $"https://firestore.googleapis.com/v1/projects/mywebtools-f8d53/databases/(default)/documents/subscription_requests/{GetDeviceID()}?updateMask.fieldPaths={field}&key=AIzaSyDGd3KAo45UuqmeGFALziz_oKm3htEASHY";
+            string valStr = isString ? $"stringValue = '{value}'" : $"booleanValue = {value}";
+            string cmd = $"$body = @{{ fields = @{{ {field} = @{{ {valStr} }} }} }} | ConvertTo-Json -Depth 5; Invoke-RestMethod -Uri '{url}' -Method Patch -Body $body -ContentType 'application/json'";
+            Process.Start(new ProcessStartInfo { FileName = "powershell.exe", Arguments = $"-WindowStyle Hidden -Command \"{cmd}\"", CreateNoWindow = true, UseShellExecute = false });
+        }
+
+        private void SyncLoop_Tick(object sender, EventArgs e) {
+            string activeStr = isSessionActive ? "$true" : "$false";
+            SyncToFirebase("isSelfControlActive", activeStr, false);
+        }
+
+        private async void LicenseCheck_Tick(object sender, EventArgs e) {
+            try {
+                using (HttpClient client = new HttpClient()) {
+                    string url = $"https://firestore.googleapis.com/v1/projects/mywebtools-f8d53/databases/(default)/documents/subscription_requests/{GetDeviceID()}?key=AIzaSyDGd3KAo45UuqmeGFALziz_oKm3htEASHY";
+                    string res = await client.GetStringAsync(url);
+                    if (res.Contains("\"stringValue\": \"REVOKED\"")) { isTrialExpired = true; isLicenseValid = false; }
+                    else if (res.Contains("\"stringValue\": \"APPROVED\"")) { isLicenseValid = true; isTrialExpired = false; }
+                }
+            } catch { }
+        }
+
+        // ==========================================
+        // 9. DYNAMIC WINDOW CREATION (100% Features)
+        // ==========================================
+        private void CreateLiveChatWindow() {
+            if (liveChatWnd != null && liveChatWnd.IsLoaded) { liveChatWnd.Activate(); return; }
+            liveChatWnd = new Window { Title = "Live Chat with Admin", Width = 400, Height = 500, WindowStartupLocation = WindowStartupLocation.CenterScreen, Background = Brushes.White };
+            StackPanel sp = new StackPanel { Margin = new Thickness(15) };
+            TextBox log = new TextBox { Height = 350, IsReadOnly = true, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Margin = new Thickness(0,0,0,10) };
+            TextBox input = new TextBox { Height = 30, Margin = new Thickness(0,0,0,10) };
+            Button btn = new Button { Content = "SEND", Height = 35, Background = new SolidColorBrush(Color.FromRgb(37, 99, 235)), Foreground = Brushes.White, FontWeight = FontWeights.Bold };
+            btn.Click += (s, e) => { if(!string.IsNullOrEmpty(input.Text)){ log.AppendText("You: " + input.Text + "\n"); SyncToFirebase("liveChatUser", input.Text); input.Clear(); } };
+            sp.Children.Add(new TextBlock{Text = "Live Support", FontSize=20, FontWeight=FontWeights.Bold, Margin=new Thickness(0,0,0,10)});
+            sp.Children.Add(log); sp.Children.Add(input); sp.Children.Add(btn); liveChatWnd.Content = sp; liveChatWnd.Show();
+        }
+
+        private void CreateStopwatchWindow() {
+            if (stopwatchWnd != null && stopwatchWnd.IsLoaded) { stopwatchWnd.Activate(); return; }
+            stopwatchWnd = new Window { Title = "Pro Stopwatch", Width = 400, Height = 250, WindowStartupLocation = WindowStartupLocation.CenterScreen, Background = Brushes.White };
+            StackPanel sp = new StackPanel { Margin = new Thickness(20), HorizontalAlignment = HorizontalAlignment.Center };
+            TextBlock txt = new TextBlock { Text = "00:00:00", FontSize = 50, FontWeight = FontWeights.Bold, FontFamily = new FontFamily("Consolas"), Margin = new Thickness(0,0,0,20) };
+            Button btn = new Button { Content = "START / PAUSE", Height = 40, Width = 200, Background = Brushes.Teal, Foreground = Brushes.White, FontWeight = FontWeights.Bold };
+            DispatcherTimer swT = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) }; int s = 0;
+            swT.Tick += (sender, e) => { s++; TimeSpan ts = TimeSpan.FromSeconds(s); txt.Text = ts.ToString(@"hh\:mm\:ss"); };
+            btn.Click += (sender, e) => { if(swT.IsEnabled) swT.Stop(); else swT.Start(); };
+            sp.Children.Add(txt); sp.Children.Add(btn); stopwatchWnd.Content = sp; stopwatchWnd.Show();
+        }
+
+        private void CreateUpgradeWindow() {
+            if (upgradeWnd != null && upgradeWnd.IsLoaded) { upgradeWnd.Activate(); return; }
+            upgradeWnd = new Window { Title = "Upgrade to Premium", Width = 450, Height = 500, WindowStartupLocation = WindowStartupLocation.CenterScreen, Background = Brushes.White };
+            StackPanel sp = new StackPanel { Margin = new Thickness(20) };
+            sp.Children.Add(new TextBlock{Text="Send payment via bKash/Nagad to 01566054963", FontSize=16, FontWeight=FontWeights.Bold, Foreground=Brushes.Teal, Margin=new Thickness(0,0,0,20)});
+            sp.Children.Add(new TextBlock{Text="Email / Name:"}); TextBox email = new TextBox{Margin=new Thickness(0,5,0,15)}; sp.Children.Add(email);
+            sp.Children.Add(new TextBlock{Text="Sender Number:"}); TextBox phone = new TextBox{Margin=new Thickness(0,5,0,15)}; sp.Children.Add(phone);
+            sp.Children.Add(new TextBlock{Text="TrxID:"}); TextBox trx = new TextBox{Margin=new Thickness(0,5,0,15)}; sp.Children.Add(trx);
+            Button btn = new Button{Content="SUBMIT REQUEST", Height=40, Background=Brushes.Teal, Foreground=Brushes.White, FontWeight=FontWeights.Bold, Margin=new Thickness(0,20,0,0)};
+            btn.Click += (s,e) => { SyncToFirebase("status", "PENDING"); MessageBox.Show("Request Sent!"); upgradeWnd.Close(); };
+            sp.Children.Add(btn); upgradeWnd.Content = sp; upgradeWnd.Show();
+        }
+
+        private void CreatePomodoroSetupWindow() {
+            Window pWnd = new Window { Title = "Pomodoro Setup", Width = 350, Height = 250, WindowStartupLocation = WindowStartupLocation.CenterScreen, Background = Brushes.White };
+            StackPanel sp = new StackPanel { Margin = new Thickness(20) };
+            sp.Children.Add(new TextBlock{Text="Focus Length (Minutes):"}); TextBox fLen = new TextBox{Text="25", Margin=new Thickness(0,5,0,15)}; sp.Children.Add(fLen);
+            sp.Children.Add(new TextBlock{Text="Total Sessions:"}); TextBox sCnt = new TextBox{Text="4", Margin=new Thickness(0,5,0,15)}; sp.Children.Add(sCnt);
+            Button btn = new Button{Content="START POMODORO", Height=40, Background=Brushes.Teal, Foreground=Brushes.White, FontWeight=FontWeights.Bold};
+            btn.Click += (s,e) => { pomoLengthMin = int.Parse(fLen.Text); pomoTotalSessions = int.Parse(sCnt.Text); isPomodoroMode = true; isSessionActive = true; pomoTicks = 0; pomoCurrentSession = 1; ManageFocusSound(true); pWnd.Close(); };
+            sp.Children.Add(btn); pWnd.Content = sp; pWnd.Show();
+        }
+
+        // Helper functions
+        private string GetRandomQuote(int type) { Random r = new Random(); return type == 1 ? islamicQuotes[r.Next(islamicQuotes.Length)] : timeQuotes[r.Next(timeQuotes.Length)]; }
+        private void CloseWindowNatively(IntPtr hWnd) { SetForegroundWindow(hWnd); keybd_event(VK_CONTROL, 0, 0, UIntPtr.Zero); keybd_event((byte)'W', 0, 0, UIntPtr.Zero); keybd_event((byte)'W', 0, KEYEVENTF_KEYUP, UIntPtr.Zero); keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, UIntPtr.Zero); Thread.Sleep(50); ShowWindow(hWnd, SW_MINIMIZE); }
+        private void ShowOverlay(string msg) {
+            if (overlayWindow == null) {
+                overlayWindow = new Window { WindowStyle = WindowStyle.None, AllowsTransparency = true, Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(240, 9, 61, 31)), Topmost = true, Width = 800, Height = 300, WindowStartupLocation = WindowStartupLocation.CenterScreen };
+                overlayWindow.Content = new TextBlock { Text = msg, Foreground = Brushes.White, FontSize = 24, FontWeight = FontWeights.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center, Margin = new Thickness(20) };
+            } else { ((TextBlock)overlayWindow.Content).Text = msg; }
+            overlayWindow.Show(); overlayWindow.Topmost = true;
+            DispatcherTimer t = new DispatcherTimer { Interval = TimeSpan.FromSeconds(6) };
+            t.Tick += (s, ev) => { overlayWindow.Hide(); t.Stop(); }; t.Start();
+        }
+        private void ManageFocusSound(bool start) { string aPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "focus_noise.mp3"); if (start && File.Exists(aPath)) { mciSendString($"open \"{aPath}\" type mpegvideo alias focusSound", null, 0, IntPtr.Zero); mciSendString("play focusSound repeat", null, 0, IntPtr.Zero); } else { mciSendString("stop focusSound", null, 0, IntPtr.Zero); mciSendString("close focusSound", null, 0, IntPtr.Zero); } }
+        private void ClearSessionData() { isSessionActive = false; isPassMode = false; isTimeMode = false; isPomodoroMode = false; currentSessionPass = ""; SaveData(); UpdateUIStates(); ManageFocusSound(false); }
+        private void SaveData() { File.WriteAllLines(Path.Combine(secretDir, "bl_app.txt"), blockedApps); }
+        private void LoadData() { string p = Path.Combine(secretDir, "bl_app.txt"); if (File.Exists(p)) blockedApps = File.ReadAllLines(p).ToList(); }
+        
+        // Auto-detect UI inputs gracefully
+        private string FindTextBoxValue(string name) { TextBox t = this.FindName(name) as TextBox; return t != null ? t.Text : ""; }
+        private void PopulateComboBoxes() {
+            // Populate ComboBoxes if they exist in your XAML
+            ComboBox cApp = this.FindName("ComboAppBlock") as ComboBox;
+            if(cApp != null) { foreach(var app in commonThirdPartyApps) cApp.Items.Add(app); cApp.SelectedIndex = 0; }
+        }
+        private void RefreshUILists() {
+            ListBox lb = this.FindName("ListBlockedApps") as ListBox;
+            if(lb != null) { lb.Items.Clear(); foreach(var a in blockedApps) lb.Items.Add(a); }
+        }
+    }
+}
