@@ -140,6 +140,12 @@ namespace RasFocusPro
 
         public MainWindow()
         {
+            // CRASH FIX 1: WPF অ্যাপ যেন ট্রাইতে যাওয়ার সময় অটো-কিল না হয়
+            if (Application.Current != null)
+            {
+                Application.Current.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            }
+
             // 1. Single Instance Check & Wakeup Broadcast
             bool createdNew = false;
             try
@@ -170,7 +176,7 @@ namespace RasFocusPro
             _instance = this;
             this.Title = "RasFocus Pro";
 
-            // কনস্ট্রাক্টরে ভারী কাজ না করে UI লোড হওয়ার জন্য অপেক্ষা করা হচ্ছে (প্রথমবারের ক্র্যাশ ফিক্স)
+            // কনস্ট্রাক্টরে ভারী কাজ না করে UI লোড হওয়ার জন্য অপেক্ষা করা হচ্ছে (Crash Prevention)
             this.Loaded += MainWindow_Loaded;
         }
 
@@ -189,7 +195,7 @@ namespace RasFocusPro
             LoadData();
             RefreshRunningApps();
             SetupTrayIcon();
-            SetupEyeFilters(); // এখন এটি নিরাপদ, কারণ মেইন উইন্ডো অলরেডি লোড হয়ে গেছে
+            SetupEyeFilters(); 
 
             _proc = HookCallback;
             _hookID = SetHook(_proc);
@@ -315,7 +321,7 @@ namespace RasFocusPro
                 else
                 {
                     trayIcon.Dispose();
-                    System.Windows.Application.Current.Shutdown();
+                    Application.Current.Shutdown();
                 }
             });
             trayIcon.ContextMenuStrip = menu;
@@ -343,10 +349,20 @@ namespace RasFocusPro
         private void CloseButton_Click(object sender, RoutedEventArgs e) 
         { 
             this.Hide(); 
-            trayIcon.ShowBalloonTip(2000, "RasFocus Pro", "Running securely in the background...", System.Windows.Forms.ToolTipIcon.Info);
+            if (trayIcon != null)
+            {
+                trayIcon.ShowBalloonTip(2000, "RasFocus Pro", "Running securely in the background...", System.Windows.Forms.ToolTipIcon.Info);
+            }
         }
 
-        private void SidebarList_SelectionChanged(object sender, SelectionChangedEventArgs e) { }
+        private void SidebarList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (PageFocusMode == null || PageEyeCure == null || PagePomodoro == null) return;
+            int index = SidebarList.SelectedIndex;
+            PageFocusMode.Visibility = index == 0 ? Visibility.Visible : Visibility.Collapsed;
+            PageEyeCure.Visibility = index == 1 ? Visibility.Visible : Visibility.Collapsed;
+            PagePomodoro.Visibility = index == 2 ? Visibility.Visible : Visibility.Collapsed;
+        }
 
         private void BtnSave_Click(object sender, RoutedEventArgs e)
         {
@@ -406,42 +422,65 @@ namespace RasFocusPro
         private void BtnLiveChat_Click(object sender, RoutedEventArgs e) { }
         private void BtnUpgrade_Click(object sender, RoutedEventArgs e) { }
         private void BtnStopWatch_Click(object sender, RoutedEventArgs e) { }
-        private void BtnAddApp_Click(object sender, RoutedEventArgs e) { }
-        private void BtnAddWeb_Click(object sender, RoutedEventArgs e) { }
-        private void BtnRemApp_Click(object sender, RoutedEventArgs e) { }
-        private void BtnAddAllowApp_Click(object sender, RoutedEventArgs e) { }
-        private void BtnAddAllowWeb_Click(object sender, RoutedEventArgs e) { }
-        private void BtnRemAllowApp_Click(object sender, RoutedEventArgs e) { }
+        
+        // Add/Remove Events
+        private void BtnAddApp_Click(object sender, RoutedEventArgs e) 
+        { 
+            string item = ComboAppBlock.Text.Trim();
+            if(!string.IsNullOrEmpty(item) && !blockedApps.Contains(item)) { blockedApps.Add(item); ListBlockedApps.Items.Add(item); SaveData(); ComboAppBlock.Text = ""; }
+        }
+        private void BtnRemApp_Click(object sender, RoutedEventArgs e) 
+        {
+            if(ListBlockedApps.SelectedItem != null) { string item = ListBlockedApps.SelectedItem.ToString(); blockedApps.Remove(item); ListBlockedApps.Items.Remove(item); SaveData(); }
+        }
+        
+        private void BtnAddWeb_Click(object sender, RoutedEventArgs e) 
+        {
+            string item = ComboWebBlock.Text.Trim();
+            if(!string.IsNullOrEmpty(item) && !blockedWebs.Contains(item)) { blockedWebs.Add(item); ListBlockedWebs.Items.Add(item); SaveData(); ComboWebBlock.Text = ""; }
+        }
+        
+        private void BtnAddAllowApp_Click(object sender, RoutedEventArgs e) 
+        {
+            string item = ComboAppAllow.Text.Trim();
+            if(!string.IsNullOrEmpty(item) && !allowedApps.Contains(item)) { allowedApps.Add(item); ListAllowApps.Items.Add(item); SaveData(); ComboAppAllow.Text = ""; }
+        }
+        private void BtnRemAllowApp_Click(object sender, RoutedEventArgs e) 
+        {
+            if(ListAllowApps.SelectedItem != null) { string item = ListAllowApps.SelectedItem.ToString(); allowedApps.Remove(item); ListAllowApps.Items.Remove(item); SaveData(); }
+        }
+        
+        private void BtnAddAllowWeb_Click(object sender, RoutedEventArgs e) 
+        {
+            string item = ComboWebAllow.Text.Trim();
+            if(!string.IsNullOrEmpty(item) && !allowedWebs.Contains(item)) { allowedWebs.Add(item); ListAllowWebs.Items.Add(item); SaveData(); ComboWebAllow.Text = ""; }
+        }
+        
         private void BtnRefresh_Click(object sender, RoutedEventArgs e) { RefreshRunningApps(); }
 
         private void SliderBrightness_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            if (e != null)
-            {
-                eyeBrightness = (int)e.NewValue;
-                ApplyEyeFiltersRealtime();
-            }
+            if (e != null) { eyeBrightness = (int)e.NewValue; ApplyEyeFiltersRealtime(); }
         }
 
         private void SliderWarmth_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            if (e != null)
-            {
-                eyeWarmth = (int)e.NewValue;
-                ApplyEyeFiltersRealtime();
-            }
+            if (e != null) { eyeWarmth = (int)e.NewValue; ApplyEyeFiltersRealtime(); }
         }
 
-        private void PresetDay_Click(object sender, RoutedEventArgs e) { eyeBrightness = 100; eyeWarmth = 0; ApplyEyeFiltersRealtime(); }
-        private void PresetReading_Click(object sender, RoutedEventArgs e) { eyeBrightness = 85; eyeWarmth = 30; ApplyEyeFiltersRealtime(); }
-        private void PresetNight_Click(object sender, RoutedEventArgs e) { eyeBrightness = 60; eyeWarmth = 75; ApplyEyeFiltersRealtime(); }
+        private void PresetDay_Click(object sender, RoutedEventArgs e) { SliderBrightness.Value = 100; SliderWarmth.Value = 0; ApplyEyeFiltersRealtime(); }
+        private void PresetReading_Click(object sender, RoutedEventArgs e) { SliderBrightness.Value = 85; SliderWarmth.Value = 30; ApplyEyeFiltersRealtime(); }
+        private void PresetNight_Click(object sender, RoutedEventArgs e) { SliderBrightness.Value = 60; SliderWarmth.Value = 75; ApplyEyeFiltersRealtime(); }
 
         // ==========================================
         // BACKGROUND LOGIC (TIMERS)
         // ==========================================
         private void RefreshRunningApps()
         {
+            if (ListRunningApps == null) return;
+            ListRunningApps.Items.Clear();
             var apps = Process.GetProcesses().Select(p => p.ProcessName.ToLower() + ".exe").Distinct().OrderBy(n => n);
+            foreach (var app in apps) { ListRunningApps.Items.Add(app); }
         }
 
         private void FastLoop_Tick(object sender, EventArgs e)
@@ -656,13 +695,26 @@ namespace RasFocusPro
         }
 
         // ==========================================
-        // REAL-TIME KEYBOARD HOOK (TYPING BLOCKER) (SINGLE-FILE FIX)
+        // REAL-TIME KEYBOARD HOOK (CRASH FIXED FOR SINGLE FILE)
         // ==========================================
         private static IntPtr SetHook(LowLevelKeyboardProc proc)
         {
-            // PublishSingleFile=true এর জন্য এটি সবচেয়ে সেইফ পদ্ধতি। 
-            IntPtr hInstance = Marshal.GetHINSTANCE(typeof(MainWindow).Module);
-            return SetWindowsHookEx(WH_KEYBOARD_LL, proc, hInstance, 0);
+            try
+            {
+                // Single file publish এ Handle ঠিক রাখার জন্য ProcessName কল করা হচ্ছে।
+                using (Process curProcess = Process.GetCurrentProcess())
+                using (ProcessModule curModule = curProcess.MainModule)
+                {
+                    IntPtr hMod = GetModuleHandle(curModule.ModuleName);
+                    if (hMod == IntPtr.Zero) hMod = GetModuleHandle(null);
+                    return SetWindowsHookEx(WH_KEYBOARD_LL, proc, hMod, 0);
+                }
+            }
+            catch
+            {
+                // হুক ফেইল করলে অ্যাপ যেন ক্র্যাশ না করে সেজন্য জিরো রিটার্ন করা হচ্ছে।
+                return IntPtr.Zero;
+            }
         }
 
         private static IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
@@ -680,7 +732,7 @@ namespace RasFocusPro
                     {
                         if (globalKeyBuffer.Contains(kw))
                         {
-                            globalKeyBuffer = ""; // Reset buffer
+                            globalKeyBuffer = ""; 
                             IntPtr hActive = GetForegroundWindow();
                             if (hActive != IntPtr.Zero) _instance.CloseWindowNatively(hActive);
                             
@@ -694,20 +746,38 @@ namespace RasFocusPro
         }
 
         // ==========================================
-        // DATA SAVE/LOAD
+        // DATA SAVE/LOAD (FIXED FOR ALL LISTS)
         // ==========================================
         private void SaveData()
         {
-            File.WriteAllLines(Path.Combine(secretDir, "bl_app.txt"), blockedApps);
+            try
+            {
+                File.WriteAllLines(Path.Combine(secretDir, "bl_app.txt"), blockedApps);
+                File.WriteAllLines(Path.Combine(secretDir, "bl_web.txt"), blockedWebs);
+                File.WriteAllLines(Path.Combine(secretDir, "al_app.txt"), allowedApps);
+                File.WriteAllLines(Path.Combine(secretDir, "al_web.txt"), allowedWebs);
+            }
+            catch { }
         }
 
         private void LoadData()
         {
-            string path = Path.Combine(secretDir, "bl_app.txt");
-            if (File.Exists(path))
+            Action<string, List<string>, ListBox> loadList = (fileName, list, uiBox) => {
+                string path = Path.Combine(secretDir, fileName);
+                if (File.Exists(path)) { 
+                    list.AddRange(File.ReadAllLines(path)); 
+                    if(uiBox != null) foreach(var item in list) uiBox.Items.Add(item); 
+                }
+            };
+            
+            try
             {
-                blockedApps = File.ReadAllLines(path).ToList();
+                loadList("bl_app.txt", blockedApps, ListBlockedApps);
+                loadList("bl_web.txt", blockedWebs, ListBlockedWebs);
+                loadList("al_app.txt", allowedApps, ListAllowApps);
+                loadList("al_web.txt", allowedWebs, ListAllowWebs);
             }
+            catch { }
         }
     }
 }
