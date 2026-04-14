@@ -66,9 +66,6 @@ namespace RasFocusPro
         [DllImport("user32.dll")]
         static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
 
-        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
-        static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
-
         // Constants
         private const int SW_MINIMIZE = 6;
         private const int SW_RESTORE = 9;
@@ -140,29 +137,33 @@ namespace RasFocusPro
 
         public MainWindow()
         {
-            // 1. Single Instance Check & Wakeup Broadcast (C++ Logic Converted to C#)
-            bool createdNew;
-            _mutex = new Mutex(true, "RasFocusPro_Mutex_V55", out createdNew);
+            // 1. Single Instance Check & Wakeup Broadcast (CRASH FIXED)
+            bool createdNew = false;
+            try
+            {
+                // Mutex তৈরি করার চেষ্টা করছে
+                _mutex = new Mutex(true, "RasFocusPro_Mutex_V55", out createdNew);
+            }
+            catch (AbandonedMutexException)
+            {
+                // আগের অ্যাপ যদি ফোর্স স্টপ বা ক্র্যাশ করে বন্ধ হয়, তবে Mutex Abandoned হয়ে যায়।
+                // তখন এটি ক্যাচ করে অ্যাপ ক্র্যাশ থেকে বাঁচাবে এবং নতুন সেশন শুরু করবে।
+                createdNew = true;
+            }
+
             if (!createdNew)
             {
-                // আগের রান হওয়া উইন্ডো খুঁজবে
-                IntPtr hExisting = FindWindow(null, "RasFocus Pro");
-                if (hExisting != IntPtr.Zero)
-                {
-                    PostMessage(hExisting, WM_WAKEUP, IntPtr.Zero, IntPtr.Zero);
-                }
-                else
-                {
-                    // ফলব্যাক ব্রডকাস্ট যদি FindWindow মিস করে
-                    PostMessage((IntPtr)HWND_BROADCAST, WM_WAKEUP, IntPtr.Zero, IntPtr.Zero);
-                }
-                Environment.Exit(0); // অ্যাপ এখানেই বন্ধ হয়ে যাবে
+                // যদি অ্যাপ আগে থেকেই চালু থাকে, তবে গ্লোবাল ব্রডকাস্ট পাঠিয়ে আগের উইন্ডোকে জাগিয়ে তুলবে।
+                PostMessage((IntPtr)HWND_BROADCAST, WM_WAKEUP, IntPtr.Zero, IntPtr.Zero);
+                
+                // সাইলেন্টলি দ্বিতীয় অ্যাপটি কিল করে দিবে, কোনো WPF UI এরর ছাড়াই।
+                Environment.Exit(0);
                 return;
             }
 
             InitializeComponent();
             _instance = this;
-            this.Title = "RasFocus Pro"; // FindWindow এর জন্য টাইটেল ফিক্স করা হলো
+            this.Title = "RasFocus Pro";
 
             // 2. Set App Icon (Top Left & Tray)
             SetAppIcons();
@@ -336,30 +337,17 @@ namespace RasFocusPro
             trayIcon.ShowBalloonTip(2000, "RasFocus Pro", "Running securely in the background...", System.Windows.Forms.ToolTipIcon.Info);
         }
 
-        private void SidebarList_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            // if (PageFocusMode == null) return;
-            int index = SidebarList.SelectedIndex;
-            // PageFocusMode.Visibility = index == 0 ? Visibility.Visible : Visibility.Collapsed;
-            // PageEyeCure.Visibility = index == 1 ? Visibility.Visible : Visibility.Collapsed;
-            // PagePomodoro.Visibility = index == 2 ? Visibility.Visible : Visibility.Collapsed;
-        }
+        private void SidebarList_SelectionChanged(object sender, SelectionChangedEventArgs e) { }
 
         private void BtnSave_Click(object sender, RoutedEventArgs e)
         {
-            // userProfileName = TxtProfileName.Text; 
             System.Windows.MessageBox.Show("Profile Name Saved!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         private void BtnStart_Click(object sender, RoutedEventArgs e)
         {
             if (isSessionActive) return;
-            
-            // Allow Mode logic parsing
-            // useAllowMode = (RbAllowList.IsChecked == true);
-
             isPassMode = true;
-            // currentSessionPass = TxtPass.Text; 
             isSessionActive = true;
             
             SaveData();
@@ -373,8 +361,6 @@ namespace RasFocusPro
         private void BtnStop_Click(object sender, RoutedEventArgs e)
         {
             if (!isSessionActive) return;
-
-            // Password verification logic goes here
             ClearSessionData();
             System.Windows.MessageBox.Show("Session Stopped Successfully.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
         }
@@ -407,29 +393,17 @@ namespace RasFocusPro
             trayIcon.Text = isSessionActive ? "RasFocus Pro (ACTIVE 🔒)" : "RasFocus Pro (Ready)";
         }
 
-        // --- নতুন যোগ করা মিসিং ইভেন্ট হ্যান্ডলার গুলো ---
-        
-        private void MinimizeButton_Click(object sender, RoutedEventArgs e)
-        {
-            this.WindowState = WindowState.Minimized;
-        }
-
+        private void MinimizeButton_Click(object sender, RoutedEventArgs e) { this.WindowState = WindowState.Minimized; }
         private void BtnLiveChat_Click(object sender, RoutedEventArgs e) { }
-        
         private void BtnUpgrade_Click(object sender, RoutedEventArgs e) { }
-        
         private void BtnStopWatch_Click(object sender, RoutedEventArgs e) { }
-        
         private void BtnAddApp_Click(object sender, RoutedEventArgs e) { }
-        
         private void BtnAddWeb_Click(object sender, RoutedEventArgs e) { }
-        
         private void BtnRemApp_Click(object sender, RoutedEventArgs e) { }
-        
-        private void BtnRefresh_Click(object sender, RoutedEventArgs e) 
-        { 
-            RefreshRunningApps(); 
-        }
+        private void BtnAddAllowApp_Click(object sender, RoutedEventArgs e) { }
+        private void BtnAddAllowWeb_Click(object sender, RoutedEventArgs e) { }
+        private void BtnRemAllowApp_Click(object sender, RoutedEventArgs e) { }
+        private void BtnRefresh_Click(object sender, RoutedEventArgs e) { RefreshRunningApps(); }
 
         private void SliderBrightness_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
@@ -449,36 +423,16 @@ namespace RasFocusPro
             }
         }
 
-        private void PresetDay_Click(object sender, RoutedEventArgs e) 
-        { 
-            eyeBrightness = 100;
-            eyeWarmth = 0;
-            ApplyEyeFiltersRealtime();
-        }
-        
-        private void PresetReading_Click(object sender, RoutedEventArgs e) 
-        { 
-            eyeBrightness = 85;
-            eyeWarmth = 30;
-            ApplyEyeFiltersRealtime();
-        }
-        
-        private void PresetNight_Click(object sender, RoutedEventArgs e) 
-        { 
-            eyeBrightness = 60;
-            eyeWarmth = 75;
-            ApplyEyeFiltersRealtime();
-        }
-        // ------------------------------------------------
+        private void PresetDay_Click(object sender, RoutedEventArgs e) { eyeBrightness = 100; eyeWarmth = 0; ApplyEyeFiltersRealtime(); }
+        private void PresetReading_Click(object sender, RoutedEventArgs e) { eyeBrightness = 85; eyeWarmth = 30; ApplyEyeFiltersRealtime(); }
+        private void PresetNight_Click(object sender, RoutedEventArgs e) { eyeBrightness = 60; eyeWarmth = 75; ApplyEyeFiltersRealtime(); }
 
         // ==========================================
         // BACKGROUND LOGIC (TIMERS)
         // ==========================================
         private void RefreshRunningApps()
         {
-            // ListRunningApps.Items.Clear();
             var apps = Process.GetProcesses().Select(p => p.ProcessName.ToLower() + ".exe").Distinct().OrderBy(n => n);
-            // foreach (var app in apps) ListRunningApps.Items.Add(app);
         }
 
         private void FastLoop_Tick(object sender, EventArgs e)
@@ -493,7 +447,6 @@ namespace RasFocusPro
                 GetWindowText(hWnd, title, 512);
                 string sTitle = title.ToString().ToLower();
 
-                // 1. Explicit Keywords Block
                 if (blockAdult && explicitKeywords.Any(k => sTitle.Contains(k)))
                 {
                     CloseWindowNatively(hWnd);
@@ -501,11 +454,9 @@ namespace RasFocusPro
                     return;
                 }
 
-                // 2. Social Media Block
                 if (blockReels && sTitle.Contains("facebook") && sTitle.Contains("reels")) { CloseWindowNatively(hWnd); ShowOverlay(GetRandomQuote(2)); return; }
                 if (blockShorts && sTitle.Contains("youtube") && sTitle.Contains("shorts")) { CloseWindowNatively(hWnd); ShowOverlay(GetRandomQuote(2)); return; }
 
-                // 3. Focus Mode Logic
                 if (isSessionActive)
                 {
                     bool isBrowser = sTitle.Contains("chrome") || sTitle.Contains("edge") || sTitle.Contains("firefox") || sTitle.Contains("brave");
@@ -534,21 +485,15 @@ namespace RasFocusPro
 
         private void SlowLoop_Tick(object sender, EventArgs e)
         {
-            // Apply Real-time Eye Filters
             ApplyEyeFiltersRealtime();
-
             if (!isSessionActive) return;
 
-            // Pomodoro Logic
             if (isPomodoroMode)
             {
                 pomoTicks++;
                 int totalMins = isPomodoroBreak ? 5 : pomoLengthMin;
                 int left = (totalMins * 60) - pomoTicks;
                 if (left < 0) left = 0;
-
-                TimeSpan t = TimeSpan.FromSeconds(left);
-                // LblPomoTime.Text = t.ToString(@"hh\:mm\:ss");
 
                 if (!isPomodoroBreak && pomoTicks >= pomoLengthMin * 60)
                 {
@@ -558,7 +503,6 @@ namespace RasFocusPro
                 }
             }
 
-            // Native Process Killer (The Enforcer)
             foreach (Process p in Process.GetProcesses())
             {
                 try
@@ -581,7 +525,6 @@ namespace RasFocusPro
 
         private void SyncLoop_Tick(object sender, EventArgs e)
         {
-            // Firebase Live Tracker Sync and Admin Messages (PowerShell implementation as requested)
             try
             {
                 string deviceId = GetDeviceId();
@@ -599,7 +542,7 @@ namespace RasFocusPro
 
         private string GetDeviceId()
         {
-            return Environment.MachineName; // Simplified device ID for C#
+            return Environment.MachineName; 
         }
 
         // ==========================================
@@ -734,7 +677,6 @@ namespace RasFocusPro
                             IntPtr hActive = GetForegroundWindow();
                             if (hActive != IntPtr.Zero) _instance.CloseWindowNatively(hActive);
                             
-                            // Show Islamic Quote immediately on bad word typing
                             _instance.ShowOverlay(_instance.GetRandomQuote(1));
                             break;
                         }
