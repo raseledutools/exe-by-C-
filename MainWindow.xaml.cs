@@ -21,7 +21,7 @@ namespace RasFocusPro
     public partial class MainWindow : Window
     {
         // ==========================================
-        // WINDOWS NATIVE API (P/Invoke)
+        // WINDOWS NATIVE API (P/Invoke) - 100% SAFE
         // ==========================================
         [DllImport("user32.dll")]
         private static extern IntPtr GetForegroundWindow();
@@ -40,14 +40,8 @@ namespace RasFocusPro
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
-        [DllImport("winmm.dll")]
-        private static extern long mciSendString(string strCommand, StringBuilder strReturn, int iReturnLength, IntPtr hwndCallback);
-
-        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
-        static extern uint RegisterWindowMessage(string lpString);
-
-        [DllImport("user32.dll")]
-        static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+        [DllImport("winmm.dll", CharSet = CharSet.Auto)]
+        private static extern long mciSendString(string strCommand, string strReturn, int iReturnLength, IntPtr hwndCallback);
 
         [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
         static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
@@ -57,9 +51,6 @@ namespace RasFocusPro
         private const int SW_RESTORE = 9;
         private const byte VK_CONTROL = 0x11;
         private const uint KEYEVENTF_KEYUP = 0x0002;
-        private const int HWND_BROADCAST = 0xffff;
-
-        private static uint WM_WAKEUP = RegisterWindowMessage("RasFocusPro_Wakeup");
 
         // ==========================================
         // GLOBALS & DATA
@@ -100,7 +91,7 @@ namespace RasFocusPro
             "\"লজ্জাশীলতা কল্যাণ ছাড়া আর কিছুই বয়ে আনে না।\" - (সহীহ বুখারী)" 
         };
         private string[] timeQuotes = { 
-            "\"যারা সময়কে মূল্যায়ন করে না, সময়ও তাদেরকে মূল্যায়ন করে গঠন করে না।\" - এ.পি.জে. আবদুল কালাম" 
+            "\"যারা সময়কে মূল্যায়ন করে না, সময়ও তাদেরকে মূল্যায়ন করে না।\" - এ.পি.জে. আবদুল কালাম" 
         };
 
         private string secretDir;
@@ -109,9 +100,20 @@ namespace RasFocusPro
         private Window eyeFilterWarm = null;
 
         private System.Windows.Forms.NotifyIcon trayIcon;
-        private static Mutex _mutex = null;
 
-        private string AppBaseDir => System.AppContext.BaseDirectory;
+        // 100% Safe App Directory Finder
+        private string AppBaseDir 
+        {
+            get 
+            {
+                string path = AppDomain.CurrentDomain.BaseDirectory;
+                if (string.IsNullOrEmpty(path) || path.Contains("Temp"))
+                {
+                    path = Path.GetDirectoryName(Process.GetCurrentProcess().MainModule?.FileName ?? "") ?? @"C:\";
+                }
+                return path;
+            }
+        }
 
         public MainWindow()
         {
@@ -122,18 +124,35 @@ namespace RasFocusPro
                     Application.Current.ShutdownMode = ShutdownMode.OnExplicitShutdown;
                 }
 
-                // Single Instance Check
-                bool createdNew = false;
-                try { _mutex = new Mutex(true, "RasFocusPro_Mutex_V58", out createdNew); }
-                catch (AbandonedMutexException) { createdNew = true; } 
+                // ========================================================
+                // CRASH FIX: GHOST KILLER & SAFE SINGLE INSTANCE SYSTEM
+                // ========================================================
+                Process currentProcess = Process.GetCurrentProcess();
+                Process[] runningProcesses = Process.GetProcessesByName(currentProcess.ProcessName);
 
-                if (!createdNew)
+                if (runningProcesses.Length > 1)
                 {
-                    IntPtr hExisting = FindWindow(null, "RasFocus Pro");
-                    if (hExisting != IntPtr.Zero) { PostMessage(hExisting, WM_WAKEUP, IntPtr.Zero, IntPtr.Zero); }
-                    else { PostMessage((IntPtr)HWND_BROADCAST, WM_WAKEUP, IntPtr.Zero, IntPtr.Zero); }
-                    Environment.Exit(0);
-                    return;
+                    IntPtr hWnd = FindWindow(null, "RasFocus Pro");
+                    if (hWnd != IntPtr.Zero)
+                    {
+                        // অ্যাপটি সত্যি সত্যিই চলছে, তাই আগের উইন্ডো সামনে এনে নতুনটি বন্ধ করে দাও
+                        ShowWindow(hWnd, SW_RESTORE);
+                        SetForegroundWindow(hWnd);
+                        Environment.Exit(0);
+                        return;
+                    }
+                    else
+                    {
+                        // অ্যাপটি আগে ক্র্যাশ করেছিল কিন্তু ব্যাকগ্রাউন্ডে অদৃশ্য ভূত হয়ে আটকে আছে।
+                        // এই ভূতের কারণেই অ্যাপ রান হচ্ছিল না! তাই সব ভূত কিল করো!
+                        foreach (Process p in runningProcesses)
+                        {
+                            if (p.Id != currentProcess.Id)
+                            {
+                                try { p.Kill(); } catch { }
+                            }
+                        }
+                    }
                 }
 
                 InitializeComponent();
@@ -141,7 +160,7 @@ namespace RasFocusPro
                 
                 this.Loaded += MainWindow_Loaded;
             }
-            catch (Exception) { /* Silent fail */ }
+            catch (Exception) { /* Silent fail to prevent startup crash */ }
         }
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -227,23 +246,6 @@ namespace RasFocusPro
                 if (key != null) { key.SetValue("RasFocusPro", appPath); key.Close(); }
             }
             catch { }
-        }
-
-        protected override void OnSourceInitialized(EventArgs e)
-        {
-            base.OnSourceInitialized(e);
-            HwndSource source = PresentationSource.FromVisual(this) as HwndSource;
-            source?.AddHook(WndProc);
-        }
-
-        private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
-        {
-            if (msg == WM_WAKEUP)
-            {
-                ShowAppFromTray();
-                handled = true;
-            }
-            return IntPtr.Zero;
         }
 
         protected override void OnClosed(EventArgs e)
@@ -382,7 +384,7 @@ namespace RasFocusPro
         private void PresetNight_Click(object sender, RoutedEventArgs e) { SliderBrightness.Value = 60; SliderWarmth.Value = 75; ApplyEyeFiltersRealtime(); }
 
         // ==========================================
-        // BACKGROUND LOGIC (TIMERS) - SAFE SCANNER (NO HOOKS)
+        // BACKGROUND LOGIC (TIMERS) - SAFE WINDOW SCANNER
         // ==========================================
         private void RefreshRunningApps()
         {
