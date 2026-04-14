@@ -272,7 +272,7 @@
                                 </StackPanel>
                             </Border>
 
-                            <StackPanel Padding="40,30">
+                            <StackPanel Margin="40,30">
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
                                     <TextBlock Text="Pomodoro Technique Mode" FontSize="16" Foreground="#555" VerticalAlignment="Center" Width="250"/>
                                     <CheckBox Style="{StaticResource ToggleSwitch}"/>
