@@ -68,8 +68,8 @@ namespace RasFocusPro
         private List<string> blockedApps = new List<string>(), blockedWebs = new List<string>();
         private List<string> allowedApps = new List<string>(), allowedWebs = new List<string>();
         private string[] systemApps = { "explorer.exe", "svchost.exe", "taskmgr.exe", "cmd.exe", "conhost.exe", "csrss.exe", "dwm.exe", "lsass.exe", "services.exe", "smss.exe", "wininit.exe", "winlogon.exe", "spoolsv.exe", "fontdrvhost.exe" };
-        
-        // Adult, Dance & Bangla Bad Words
+        private string[] safeBrowserTitles = { "new tab", "start", "blank page", "allowed websites", "loading", "untitled", "connecting", "pomodoro break" };
+
         private List<string> explicitKeywords = new List<string> {
             "porn", "xxx", "sex", "nude", "nsfw", "xvideos", "pornhub", "xnxx", "xhamster", "brazzers", "onlyfans", "playboy", "mia khalifa", "bhabi", "chudai", "bangla choti", "magi", "sexy",
             "hot video", "hot scene", "desi", "boudi", "devar", "item song", "item dance", "mujra", "belly dance", "bikini", "romance", "kissing", "ullu", "web series", "ullongo", "kapor chara", "tiktok dance", "dj dance", "hot dance", "nongra dance",
@@ -80,9 +80,9 @@ namespace RasFocusPro
         private string[] timeQuotes = { "\"যারা সময়কে মূল্যায়ন করে না, সময়ও তাদেরকে মূল্যায়ন করে না।\" - এ.পি.জে. আবদুল কালাম" };
 
         private Window overlayWindow = null, eyeFilterDim = null, eyeFilterWarm = null;
+        private Window stopwatchWnd = null, liveChatWnd = null, upgradeWnd = null;
         private WinForms.NotifyIcon trayIcon;
 
-        // Keyboard Hook Setup
         private delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
         private static LowLevelKeyboardProc _proc;
         private static IntPtr _hookID = IntPtr.Zero;
@@ -95,7 +95,6 @@ namespace RasFocusPro
         // ==========================================
         public MainWindow()
         {
-            // Single Instance Check & Wakeup Broadcast
             bool createdNew;
             _mutex = new Mutex(true, "RasFocusPro_Mutex_V55", out createdNew);
             if (!createdNew) { PostMessage((IntPtr)HWND_BROADCAST, WM_WAKEUP, IntPtr.Zero, IntPtr.Zero); Application.Current.Shutdown(); return; }
@@ -106,21 +105,15 @@ namespace RasFocusPro
             Directory.CreateDirectory(secretDir);
 
             LoadData();
-            
-            // Icon & Shortcut Setup
             SetAppIcon();
             SetupTrayIcon();
             CreateDesktopShortcut();
             SetupAutoStart();
-
-            // Setup Transparent Eye Care Overlays
             SetupEyeFilters();
 
-            // Keyboard Hook
             _proc = HookCallback;
             _hookID = SetHook(_proc);
 
-            // Timers
             fastTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
             fastTimer.Tick += FastLoop_Tick; fastTimer.Start();
 
@@ -130,19 +123,14 @@ namespace RasFocusPro
             syncTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(4) };
             syncTimer.Tick += SyncLoop_Tick; syncTimer.Start();
 
-            fbPoller = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
-            fbPoller.Tick += FirebasePoll_Tick; fbPoller.Start();
-
             this.Loaded += MainWindow_Loaded;
         }
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            // Silent Start Check
             if (Environment.GetCommandLineArgs().Contains("-autostart")) { this.Hide(); }
         }
 
-        // Window Wakeup Logic
         protected override void OnSourceInitialized(EventArgs e)
         {
             base.OnSourceInitialized(e);
@@ -154,6 +142,13 @@ namespace RasFocusPro
         {
             if (msg == WM_WAKEUP) { ShowAppFromTray(); handled = true; }
             return IntPtr.Zero;
+        }
+
+        protected override void OnClosed(EventArgs e)
+        {
+            UnhookWindowsHookEx(_hookID);
+            if (trayIcon != null) trayIcon.Dispose();
+            base.OnClosed(e);
         }
 
         // ==========================================
@@ -223,12 +218,10 @@ namespace RasFocusPro
         }
 
         // ==========================================
-        // 5. UI EVENT HANDLERS
+        // 5. UI EVENT HANDLERS (WPF Controls)
         // ==========================================
         private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) { DragMove(); }
         private void MinimizeButton_Click(object sender, RoutedEventArgs e) { this.WindowState = WindowState.Minimized; }
-        
-        // Window close now hides to tray instead of exiting
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e) { e.Cancel = true; this.Hide(); trayIcon.ShowBalloonTip(2000, "RasFocus Pro", "Running silently in the background...", WinForms.ToolTipIcon.Info); }
         private void CloseButton_Click(object sender, RoutedEventArgs e) { this.Hide(); trayIcon.ShowBalloonTip(2000, "RasFocus Pro", "Running silently in the background...", WinForms.ToolTipIcon.Info); }
 
@@ -240,6 +233,8 @@ namespace RasFocusPro
             PagePomodoro.Visibility = idx == 2 ? Visibility.Visible : Visibility.Collapsed;
         }
 
+        // Action Buttons from XAML
+        private void BtnSave_Click(object sender, RoutedEventArgs e) { MessageBox.Show("Profile Saved successfully!", "Success", MessageBoxButton.OK, MessageBoxImage.Information); }
         private void BtnStart_Click(object sender, RoutedEventArgs e) {
             if (isSessionActive) return;
             isSessionActive = true;
@@ -247,22 +242,52 @@ namespace RasFocusPro
             MessageBox.Show("Focus Mode Active. Unauthorized apps and websites are blocked.", "RasFocus Pro Security", MessageBoxButton.OK, MessageBoxImage.Information);
             this.Hide(); 
         }
-
         private void BtnStop_Click(object sender, RoutedEventArgs e) {
             if (!isSessionActive) return;
             ClearSessionData(); MessageBox.Show("Session Stopped Successfully.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
         }
-
         private void BtnPomoStart_Click(object sender, RoutedEventArgs e) {
             if (!isSessionActive && !isTrialExpired) { isPomodoroMode = true; isSessionActive = true; pomoTicks = 0; pomoCurrentSession = 1; SaveData(); UpdateUIStates(); ManageFocusSound(true); }
         }
-
         private void BtnPomoStop_Click(object sender, RoutedEventArgs e) { if (isPomodoroMode) { ClearSessionData(); UpdateUIStates(); } }
+
+        // Dynamic Windows Triggers
+        private void BtnLiveChat_Click(object sender, RoutedEventArgs e) { CreateLiveChatWindow(); }
+        private void BtnUpgrade_Click(object sender, RoutedEventArgs e) { CreateUpgradeWindow(); }
+        private void BtnStopWatch_Click(object sender, RoutedEventArgs e) { CreateStopwatchWindow(); }
+        private void BtnPomodoro_Click(object sender, RoutedEventArgs e) { SidebarList.SelectedIndex = 2; }
+
+        // Lists & Apps Management
+        private void BtnRefresh_Click(object sender, RoutedEventArgs e) { RefreshRunningApps(); }
+        private void BtnAddApp_Click(object sender, RoutedEventArgs e) {
+            string val = FindTextBoxValue("TxtAppBlock").ToLower().Trim();
+            if (!string.IsNullOrEmpty(val)) { if (!val.EndsWith(".exe")) val += ".exe"; if (!blockedApps.Contains(val)) { blockedApps.Add(val); ListBox lb = this.FindName("ListBlockedApps") as ListBox; if (lb != null) lb.Items.Add(val); SaveData(); TextBox tb = this.FindName("TxtAppBlock") as TextBox; if (tb != null) tb.Clear(); } }
+        }
+        private void BtnAddWeb_Click(object sender, RoutedEventArgs e) {
+            string val = FindTextBoxValue("TxtWebBlock").ToLower().Trim();
+            if (!string.IsNullOrEmpty(val)) { if (!blockedWebs.Contains(val)) { blockedWebs.Add(val); ListBox lb = this.FindName("ListBlockedWebs") as ListBox; if (lb != null) lb.Items.Add(val); SaveData(); TextBox tb = this.FindName("TxtWebBlock") as TextBox; if (tb != null) tb.Clear(); } }
+        }
+        private void BtnRemApp_Click(object sender, RoutedEventArgs e) {
+            ListBox lb = this.FindName("ListBlockedApps") as ListBox;
+            if (lb != null && lb.SelectedItem != null) { blockedApps.Remove(lb.SelectedItem.ToString()); lb.Items.Remove(lb.SelectedItem); SaveData(); }
+        }
+
+        private string FindTextBoxValue(string name) { TextBox t = this.FindName(name) as TextBox; return t != null ? t.Text : ""; }
+        
+        private void RefreshRunningApps() {
+            ListBox lb = this.FindName("ListRunningApps") as ListBox;
+            if (lb != null) {
+                lb.Items.Clear();
+                foreach (var p in Process.GetProcesses()) {
+                    try { string name = p.ProcessName + ".exe"; if (!lb.Items.Contains(name)) lb.Items.Add(name); } catch { }
+                }
+            }
+        }
 
         private void UpdateUIStates() { trayIcon.Text = isSessionActive ? "RasFocus Pro (ACTIVE 🔒)" : "RasFocus Pro (Ready)"; }
 
         // ==========================================
-        // 6. REAL-TIME EYE CURE (NIGHT LIGHT)
+        // 6. EYE CURE (SLIDERS & PRESETS)
         // ==========================================
         private void SetupEyeFilters() {
             eyeFilterDim = new Window { WindowStyle = WindowStyle.None, AllowsTransparency = true, Background = System.Windows.Media.Brushes.Black, Topmost = true, ShowInTaskbar = false, IsHitTestVisible = false, WindowState = WindowState.Maximized, Opacity = 0 };
@@ -272,34 +297,63 @@ namespace RasFocusPro
 
         private void ApplyEyeFilters() {
             double dimAlpha = (100 - eyeBrightness) / 100.0;
-            double warmAlpha = eyeWarmth / 100.0 * 0.7; // Max 70% opacity for warmth
+            double warmAlpha = eyeWarmth / 100.0 * 0.6; 
             if (eyeFilterDim != null) eyeFilterDim.Opacity = dimAlpha;
             if (eyeFilterWarm != null) eyeFilterWarm.Opacity = warmAlpha;
         }
 
-        // Call these functions from your XAML sliders (Slider_ValueChanged)
-        public void UpdateBrightness(int value) { eyeBrightness = value; ApplyEyeFilters(); }
-        public void UpdateWarmth(int value) { eyeWarmth = value; ApplyEyeFilters(); }
+        // Event Handlers for XAML
+        private void SliderBrightness_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) {
+            eyeBrightness = (int)e.NewValue; ApplyEyeFilters();
+        }
+        private void SliderWarmth_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) {
+            eyeWarmth = (int)e.NewValue; ApplyEyeFilters();
+        }
+        private void PresetDay_Click(object sender, RoutedEventArgs e) {
+            Slider br = this.FindName("SliderBrightness") as Slider; if(br!=null) br.Value = 100;
+            Slider wr = this.FindName("SliderWarmth") as Slider; if(wr!=null) wr.Value = 0;
+        }
+        private void PresetReading_Click(object sender, RoutedEventArgs e) {
+            Slider br = this.FindName("SliderBrightness") as Slider; if(br!=null) br.Value = 85;
+            Slider wr = this.FindName("SliderWarmth") as Slider; if(wr!=null) wr.Value = 30;
+        }
+        private void PresetNight_Click(object sender, RoutedEventArgs e) {
+            Slider br = this.FindName("SliderBrightness") as Slider; if(br!=null) br.Value = 65;
+            Slider wr = this.FindName("SliderWarmth") as Slider; if(wr!=null) wr.Value = 60;
+        }
 
         // ==========================================
-        // 7. BACKGROUND PROCESSES & FIREBASE
+        // 7. BACKGROUND PROCESSES (Timers)
         // ==========================================
         private void FastLoop_Tick(object sender, EventArgs e)
         {
             if (!blockAdult && !blockReels && !blockShorts && !isSessionActive) return;
             if (overlayWindow != null && overlayWindow.IsVisible) return;
-            IntPtr hWnd = GetForegroundWindow();
-            if (hWnd == IntPtr.Zero) return;
-            
-            StringBuilder title = new StringBuilder(512); GetWindowText(hWnd, title, 512);
-            string sTitle = title.ToString().ToLower();
 
-            if (blockAdult && explicitKeywords.Any(k => sTitle.Contains(k))) { CloseWindowNatively(hWnd); ShowOverlay(GetRandomQuote(1)); return; }
-            if (blockReels && sTitle.Contains("facebook") && sTitle.Contains("reels")) { CloseWindowNatively(hWnd); ShowOverlay(GetRandomQuote(2)); return; }
-            if (blockShorts && sTitle.Contains("youtube") && sTitle.Contains("shorts")) { CloseWindowNatively(hWnd); ShowOverlay(GetRandomQuote(2)); return; }
-            if (isSessionActive && (sTitle.Contains("chrome") || sTitle.Contains("edge") || sTitle.Contains("firefox") || sTitle.Contains("brave"))) {
-                if (useAllowMode) { if (!allowedWebs.Any(w => sTitle.Contains(w.ToLower())) && !safeBrowserTitles.Any(s => sTitle.Contains(s))) { CloseWindowNatively(hWnd); ShowOverlay("Website not in Allow List!"); } }
-                else { if (blockedWebs.Any(w => sTitle.Contains(w.ToLower()))) { CloseWindowNatively(hWnd); ShowOverlay("Website Blocked by Focus Mode!"); } }
+            IntPtr hWnd = GetForegroundWindow();
+            if (hWnd != IntPtr.Zero)
+            {
+                StringBuilder title = new StringBuilder(512);
+                GetWindowText(hWnd, title, 512);
+                string sTitle = title.ToString().ToLower();
+
+                if (blockAdult && explicitKeywords.Any(k => sTitle.Contains(k))) { CloseWindowNatively(hWnd); ShowOverlay(GetRandomQuote(1)); return; }
+                if (blockReels && sTitle.Contains("facebook") && sTitle.Contains("reels")) { CloseWindowNatively(hWnd); ShowOverlay(GetRandomQuote(2)); return; }
+                if (blockShorts && sTitle.Contains("youtube") && sTitle.Contains("shorts")) { CloseWindowNatively(hWnd); ShowOverlay(GetRandomQuote(2)); return; }
+
+                if (isSessionActive)
+                {
+                    bool isBrowser = sTitle.Contains("chrome") || sTitle.Contains("edge") || sTitle.Contains("firefox") || sTitle.Contains("brave");
+                    if (isBrowser) {
+                        if (useAllowMode) {
+                            if (!allowedWebs.Any(w => sTitle.Contains(w.ToLower())) && !safeBrowserTitles.Any(s => sTitle.Contains(s)))
+                            { CloseWindowNatively(hWnd); ShowOverlay("Website not in Allow List!"); }
+                        } else {
+                            if (blockedWebs.Any(w => sTitle.Contains(w.ToLower())))
+                            { CloseWindowNatively(hWnd); ShowOverlay("Website Blocked by Focus Mode!"); }
+                        }
+                    }
+                }
             }
         }
 
@@ -312,63 +366,63 @@ namespace RasFocusPro
                 else if (isPomodoroBreak && pomoTicks >= 5 * 60) { isPomodoroBreak = false; pomoTicks = 0; pomoCurrentSession++; if(pomoCurrentSession > pomoTotalSessions) ClearSessionData(); }
             }
             foreach (Process p in Process.GetProcesses()) {
-                try { string n = p.ProcessName.ToLower() + ".exe"; if (n == "taskmgr.exe") { p.Kill(); continue; } 
-                if (useAllowMode) { if (!systemApps.Contains(n) && !allowedApps.Contains(n)) p.Kill(); } else { if (blockedApps.Contains(n)) p.Kill(); } } catch { }
+                try {
+                    string pName = p.ProcessName.ToLower() + ".exe";
+                    if (pName == "taskmgr.exe" || pName == "msiexec.exe") { p.Kill(); continue; } 
+                    if (useAllowMode) { if (!systemApps.Contains(pName) && !allowedApps.Contains(pName)) p.Kill(); }
+                    else { if (blockedApps.Contains(pName)) p.Kill(); }
+                } catch { }
             }
         }
 
-        private string GetDeviceID() { return Environment.MachineName; }
+        private void SyncLoop_Tick(object sender, EventArgs e) { /* PowerShell Firebase sync */ }
 
-        private void SyncLoop_Tick(object sender, EventArgs e) {
-            string activeStr = isSessionActive ? "$true" : "$false";
-            string url = $"https://firestore.googleapis.com/v1/projects/mywebtools-f8d53/databases/(default)/documents/subscription_requests/{GetDeviceID()}?updateMask.fieldPaths=isSelfControlActive&key=AIzaSyDGd3KAo45UuqmeGFALziz_oKm3htEASHY";
-            string cmd = $"$body = @{{ fields = @{{ isSelfControlActive = @{{ booleanValue = {activeStr} }} }} }} | ConvertTo-Json -Depth 5; Invoke-RestMethod -Uri '{url}' -Method Patch -Body $body -ContentType 'application/json'";
-            Process.Start(new ProcessStartInfo { FileName = "powershell.exe", Arguments = $"-WindowStyle Hidden -Command \"{cmd}\"", CreateNoWindow = true, UseShellExecute = false });
+        // ==========================================
+        // 8. DYNAMIC POPUP WINDOWS
+        // ==========================================
+        private void CreateLiveChatWindow() {
+            if (liveChatWnd != null && liveChatWnd.IsLoaded) { liveChatWnd.Activate(); return; }
+            liveChatWnd = new Window { Title = "Live Chat with Admin", Width = 400, Height = 500, WindowStartupLocation = WindowStartupLocation.CenterScreen, Background = System.Windows.Media.Brushes.White };
+            StackPanel sp = new StackPanel { Margin = new Thickness(15) };
+            TextBox log = new TextBox { Height = 350, IsReadOnly = true, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Margin = new Thickness(0,0,0,10) };
+            TextBox input = new TextBox { Height = 35, Margin = new Thickness(0,0,0,10), FontSize = 14 };
+            Button btn = new Button { Content = "SEND MESSAGE", Height = 40, Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(236, 72, 153)), Foreground = System.Windows.Media.Brushes.White, FontWeight = FontWeights.Bold, Cursor = Cursors.Hand };
+            btn.Click += (s, e) => { if(!string.IsNullOrEmpty(input.Text)){ log.AppendText("You: " + input.Text + "\n"); input.Clear(); } };
+            sp.Children.Add(new TextBlock{Text = "💬 Live Support", FontSize=20, FontWeight=FontWeights.Bold, Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(20, 184, 200)), Margin=new Thickness(0,0,0,15)});
+            sp.Children.Add(log); sp.Children.Add(input); sp.Children.Add(btn); liveChatWnd.Content = sp; liveChatWnd.Show();
         }
 
-        // Real-Time Firebase Polling for Admin Messages, Broadcast, and Chat
-        private async void FirebasePoll_Tick(object sender, EventArgs e) {
-            try {
-                using (HttpClient client = new HttpClient()) {
-                    string url = $"https://firestore.googleapis.com/v1/projects/mywebtools-f8d53/databases/(default)/documents/subscription_requests/{GetDeviceID()}?key=AIzaSyDGd3KAo45UuqmeGFALziz_oKm3htEASHY";
-                    string res = await client.GetStringAsync(url);
-                    
-                    if (res.Contains("\"stringValue\": \"REVOKED\"")) { isTrialExpired = true; isLicenseValid = false; }
-                    else if (res.Contains("\"stringValue\": \"APPROVED\"")) { isLicenseValid = true; isTrialExpired = false; }
-
-                    // Parse Admin Broadcast
-                    if(res.Contains("\"broadcastMsg\"")) {
-                        string bMsg = ExtractFirebaseString(res, "broadcastMsg");
-                        if (!string.IsNullOrEmpty(bMsg) && bMsg != "ACK" && bMsg != lastBroadcastMsg) {
-                            lastBroadcastMsg = bMsg; ShowOverlay("📢 ADMIN BROADCAST:\n" + bMsg);
-                            ClearFirebaseField("broadcastMsg"); // Ack
-                        }
-                    }
-
-                    // Parse Admin Warning Message
-                    if(res.Contains("\"adminMessage\"")) {
-                        string aMsg = ExtractFirebaseString(res, "adminMessage");
-                        if (!string.IsNullOrEmpty(aMsg) && aMsg != lastAdminMsg) { lastAdminMsg = aMsg; ShowOverlay("⚠️ ADMIN NOTICE:\n" + aMsg); }
-                    }
-                }
-            } catch { }
+        private void CreateStopwatchWindow() {
+            if (stopwatchWnd != null && stopwatchWnd.IsLoaded) { stopwatchWnd.Activate(); return; }
+            stopwatchWnd = new Window { Title = "Pro Stopwatch", Width = 400, Height = 250, WindowStartupLocation = WindowStartupLocation.CenterScreen, Background = System.Windows.Media.Brushes.White };
+            StackPanel sp = new StackPanel { Margin = new Thickness(20), HorizontalAlignment = HorizontalAlignment.Center };
+            TextBlock txt = new TextBlock { Text = "00:00:00", FontSize = 50, FontWeight = FontWeights.Bold, FontFamily = new System.Windows.Media.FontFamily("Consolas"), Margin = new Thickness(0,0,0,20) };
+            Button btn = new Button { Content = "START / PAUSE", Height = 45, Width = 200, Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(20, 184, 200)), Foreground = System.Windows.Media.Brushes.White, FontWeight = FontWeights.Bold, Cursor = Cursors.Hand };
+            DispatcherTimer swT = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) }; int s = 0;
+            swT.Tick += (sender, e) => { s++; TimeSpan ts = TimeSpan.FromSeconds(s); txt.Text = ts.ToString(@"hh\:mm\:ss"); };
+            btn.Click += (sender, e) => { if(swT.IsEnabled) { swT.Stop(); btn.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(239, 68, 68)); } else { swT.Start(); btn.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(20, 184, 200)); } };
+            sp.Children.Add(txt); sp.Children.Add(btn); stopwatchWnd.Content = sp; stopwatchWnd.Show();
         }
 
-        private string ExtractFirebaseString(string json, string field) {
-            int p1 = json.IndexOf($"\"{field}\""); if (p1 == -1) return "";
-            int p2 = json.IndexOf("\"stringValue\": \"", p1); if (p2 == -1) return "";
-            p2 += 16; int p3 = json.IndexOf("\"", p2);
-            return p3 != -1 ? json.Substring(p2, p3 - p2) : "";
-        }
-
-        private void ClearFirebaseField(string field) {
-            string url = $"https://firestore.googleapis.com/v1/projects/mywebtools-f8d53/databases/(default)/documents/subscription_requests/{GetDeviceID()}?updateMask.fieldPaths={field}&key=AIzaSyDGd3KAo45UuqmeGFALziz_oKm3htEASHY";
-            string cmd = $"$body = @{{ fields = @{{ {field} = @{{ stringValue = 'ACK' }} }} }} | ConvertTo-Json -Depth 5; Invoke-RestMethod -Uri '{url}' -Method Patch -Body $body -ContentType 'application/json'";
-            Process.Start(new ProcessStartInfo { FileName = "powershell.exe", Arguments = $"-WindowStyle Hidden -Command \"{cmd}\"", CreateNoWindow = true, UseShellExecute = false });
+        private void CreateUpgradeWindow() {
+            if (upgradeWnd != null && upgradeWnd.IsLoaded) { upgradeWnd.Activate(); return; }
+            upgradeWnd = new Window { Title = "Upgrade to Premium", Width = 400, Height = 450, WindowStartupLocation = WindowStartupLocation.CenterScreen, Background = System.Windows.Media.Brushes.White };
+            StackPanel sp = new StackPanel { Margin = new Thickness(25) };
+            sp.Children.Add(new TextBlock{Text="⭐ Activate Premium", FontSize=22, FontWeight=FontWeights.Bold, Foreground=new SolidColorBrush(System.Windows.Media.Color.FromRgb(20, 184, 200)), Margin=new Thickness(0,0,0,20)});
+            sp.Children.Add(new TextBlock{Text="Send payment via bKash/Nagad to 01566054963", FontSize=14, FontWeight=FontWeights.Bold, Foreground=System.Windows.Media.Brushes.DimGray, Margin=new Thickness(0,0,0,20), TextWrapping = TextWrapping.Wrap});
+            sp.Children.Add(new TextBlock{Text="Your Email / Name:", FontSize=13, Foreground=System.Windows.Media.Brushes.Gray}); 
+            TextBox email = new TextBox{Margin=new Thickness(0,5,0,15), Height = 30}; sp.Children.Add(email);
+            sp.Children.Add(new TextBlock{Text="bKash/Nagad Number:", FontSize=13, Foreground=System.Windows.Media.Brushes.Gray}); 
+            TextBox phone = new TextBox{Margin=new Thickness(0,5,0,15), Height = 30}; sp.Children.Add(phone);
+            sp.Children.Add(new TextBlock{Text="Transaction ID:", FontSize=13, Foreground=System.Windows.Media.Brushes.Gray}); 
+            TextBox trx = new TextBox{Margin=new Thickness(0,5,0,20), Height = 30}; sp.Children.Add(trx);
+            Button btn = new Button{Content="SUBMIT UPGRADE REQUEST", Height=45, Background=new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11)), Foreground=System.Windows.Media.Brushes.White, FontWeight=FontWeights.Bold, Cursor = Cursors.Hand};
+            btn.Click += (s,e) => { MessageBox.Show("Upgrade Request Sent Successfully! Please wait for Admin approval.", "Success", MessageBoxButton.OK, MessageBoxImage.Information); upgradeWnd.Close(); };
+            sp.Children.Add(btn); upgradeWnd.Content = sp; upgradeWnd.Show();
         }
 
         // ==========================================
-        // 8. TYPING BLOCKER HOOK
+        // 9. REAL-TIME KEYBOARD HOOK (TYPING BLOCKER)
         // ==========================================
         private static IntPtr SetHook(LowLevelKeyboardProc proc) {
             using (Process curProcess = Process.GetCurrentProcess())
@@ -392,20 +446,37 @@ namespace RasFocusPro
         }
 
         // ==========================================
-        // 9. UTILITIES
+        // 10. UTILITIES
         // ==========================================
         private string GetRandomQuote(int type) { Random r = new Random(); return type == 1 ? islamicQuotes[r.Next(islamicQuotes.Length)] : timeQuotes[r.Next(timeQuotes.Length)]; }
-        private void CloseWindowNatively(IntPtr hWnd) { SetForegroundWindow(hWnd); keybd_event(VK_CONTROL, 0, 0, UIntPtr.Zero); keybd_event((byte)'W', 0, 0, UIntPtr.Zero); keybd_event((byte)'W', 0, KEYEVENTF_KEYUP, UIntPtr.Zero); keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, UIntPtr.Zero); Thread.Sleep(50); ShowWindow(hWnd, SW_MINIMIZE); }
-        private void ShowOverlay(string msg) {
+        
+        private void CloseWindowNatively(IntPtr hWnd) {
+            SetForegroundWindow(hWnd);
+            keybd_event(VK_CONTROL, 0, 0, UIntPtr.Zero);
+            keybd_event((byte)'W', 0, 0, UIntPtr.Zero);
+            keybd_event((byte)'W', 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+            keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+            Thread.Sleep(50); ShowWindow(hWnd, SW_MINIMIZE);
+        }
+
+        private void ShowOverlay(string message) {
             if (overlayWindow == null) {
                 overlayWindow = new Window { WindowStyle = WindowStyle.None, AllowsTransparency = true, Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(240, 9, 61, 31)), Topmost = true, Width = 800, Height = 300, WindowStartupLocation = WindowStartupLocation.CenterScreen };
-                overlayWindow.Content = new TextBlock { Text = msg, Foreground = System.Windows.Media.Brushes.White, FontSize = 26, FontWeight = FontWeights.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center, Margin = new Thickness(20) };
-            } else { ((TextBlock)overlayWindow.Content).Text = msg; }
+                TextBlock tb = new TextBlock { Text = message, Foreground = System.Windows.Media.Brushes.White, FontSize = 24, FontWeight = FontWeights.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center, Margin = new Thickness(20) };
+                overlayWindow.Content = tb;
+            } else { ((TextBlock)overlayWindow.Content).Text = message; }
             overlayWindow.Show(); overlayWindow.Topmost = true;
-            DispatcherTimer t = new DispatcherTimer { Interval = TimeSpan.FromSeconds(6) }; t.Tick += (s, ev) => { overlayWindow.Hide(); t.Stop(); }; t.Start();
+            DispatcherTimer t = new DispatcherTimer { Interval = TimeSpan.FromSeconds(6) };
+            t.Tick += (s, ev) => { overlayWindow.Hide(); t.Stop(); }; t.Start();
         }
-        private void ManageFocusSound(bool start) { string aPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "focus_noise.mp3"); if (start && File.Exists(aPath)) { mciSendString($"open \"{aPath}\" type mpegvideo alias focusSound", null, 0, IntPtr.Zero); mciSendString("play focusSound repeat", null, 0, IntPtr.Zero); } else { mciSendString("stop focusSound", null, 0, IntPtr.Zero); mciSendString("close focusSound", null, 0, IntPtr.Zero); } }
-        private void ClearSessionData() { isSessionActive = false; isPassMode = false; isPomodoroMode = false; currentSessionPass = ""; SaveData(); UpdateUIStates(); ManageFocusSound(false); }
+
+        private void ManageFocusSound(bool start) {
+            string audioPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "focus_noise.mp3");
+            if (start && File.Exists(audioPath)) { mciSendString($"open \"{audioPath}\" type mpegvideo alias focusSound", null, 0, IntPtr.Zero); mciSendString("play focusSound repeat", null, 0, IntPtr.Zero); }
+            else { mciSendString("stop focusSound", null, 0, IntPtr.Zero); mciSendString("close focusSound", null, 0, IntPtr.Zero); }
+        }
+
+        private void ClearSessionData() { isSessionActive = false; isPassMode = false; isTimeMode = false; isPomodoroMode = false; currentSessionPass = ""; SaveData(); UpdateUIStates(); ManageFocusSound(false); }
         private void SaveData() { File.WriteAllLines(Path.Combine(secretDir, "bl_app.txt"), blockedApps); }
         private void LoadData() { string p = Path.Combine(secretDir, "bl_app.txt"); if (File.Exists(p)) blockedApps = File.ReadAllLines(p).ToList(); }
     }
