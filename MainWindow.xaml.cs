@@ -156,7 +156,7 @@ namespace RasFocusPro
                     // ফলব্যাক ব্রডকাস্ট যদি FindWindow মিস করে
                     PostMessage((IntPtr)HWND_BROADCAST, WM_WAKEUP, IntPtr.Zero, IntPtr.Zero);
                 }
-                Environment.Exit(0); // অ্যাপ এখানেই বন্ধ হয়ে যাবে
+                Environment.Exit(0); // অ্যাপ এখানেই বন্ধ হয়ে যাবে
                 return;
             }
 
@@ -407,6 +407,70 @@ namespace RasFocusPro
             trayIcon.Text = isSessionActive ? "RasFocus Pro (ACTIVE 🔒)" : "RasFocus Pro (Ready)";
         }
 
+        // --- নতুন যোগ করা মিসিং ইভেন্ট হ্যান্ডলার গুলো ---
+        
+        private void MinimizeButton_Click(object sender, RoutedEventArgs e)
+        {
+            this.WindowState = WindowState.Minimized;
+        }
+
+        private void BtnLiveChat_Click(object sender, RoutedEventArgs e) { }
+        
+        private void BtnUpgrade_Click(object sender, RoutedEventArgs e) { }
+        
+        private void BtnStopWatch_Click(object sender, RoutedEventArgs e) { }
+        
+        private void BtnAddApp_Click(object sender, RoutedEventArgs e) { }
+        
+        private void BtnAddWeb_Click(object sender, RoutedEventArgs e) { }
+        
+        private void BtnRemApp_Click(object sender, RoutedEventArgs e) { }
+        
+        private void BtnRefresh_Click(object sender, RoutedEventArgs e) 
+        { 
+            RefreshRunningApps(); 
+        }
+
+        private void SliderBrightness_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (e != null)
+            {
+                eyeBrightness = (int)e.NewValue;
+                ApplyEyeFiltersRealtime();
+            }
+        }
+
+        private void SliderWarmth_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (e != null)
+            {
+                eyeWarmth = (int)e.NewValue;
+                ApplyEyeFiltersRealtime();
+            }
+        }
+
+        private void PresetDay_Click(object sender, RoutedEventArgs e) 
+        { 
+            eyeBrightness = 100;
+            eyeWarmth = 0;
+            ApplyEyeFiltersRealtime();
+        }
+        
+        private void PresetReading_Click(object sender, RoutedEventArgs e) 
+        { 
+            eyeBrightness = 85;
+            eyeWarmth = 30;
+            ApplyEyeFiltersRealtime();
+        }
+        
+        private void PresetNight_Click(object sender, RoutedEventArgs e) 
+        { 
+            eyeBrightness = 60;
+            eyeWarmth = 75;
+            ApplyEyeFiltersRealtime();
+        }
+        // ------------------------------------------------
+
         // ==========================================
         // BACKGROUND LOGIC (TIMERS)
         // ==========================================
@@ -602,7 +666,6 @@ namespace RasFocusPro
         {
             if (eyeFilterDim != null && eyeFilterWarm != null)
             {
-                // UI থেকে eyeBrightness এবং eyeWarmth স্লাইডারের ভ্যালু রিড করে এখানে বসবে
                 double dimOpacity = (100 - eyeBrightness) / 100.0;
                 double warmOpacity = (eyeWarmth / 100.0) * 0.5; // max 50% opacity for warmth
 
