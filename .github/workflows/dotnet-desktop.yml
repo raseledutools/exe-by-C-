@@ -22,9 +22,9 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore
 
-    - name: Publish Single EXE
-      # এই কমান্ডটি কোনো আলাদা DLL ছাড়া শুধুমাত্র একটি .exe ফাইল তৈরি করবে
-      run: dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o ./publish_output
+    - name: Publish Single EXE (Tiny Size)
+      # --self-contained false করা হয়েছে অ্যাপের সাইজ ২-৩ এমবি করার জন্য
+      run: dotnet publish -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o ./publish_output
 
     - name: Upload EXE Artifact
       uses: actions/upload-artifact@v4
