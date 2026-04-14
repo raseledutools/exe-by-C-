@@ -21,7 +21,7 @@ namespace RasFocusPro
     public partial class MainWindow : Window
     {
         // ==========================================
-        // WINDOWS NATIVE API (P/Invoke)
+        // WINDOWS NATIVE API (P/Invoke) - HOOKS REMOVED FOR SAFETY
         // ==========================================
         [DllImport("user32.dll")]
         private static extern IntPtr GetForegroundWindow();
@@ -46,19 +46,6 @@ namespace RasFocusPro
         [DllImport("winmm.dll")]
         private static extern long mciSendString(string strCommand, StringBuilder strReturn, int iReturnLength, IntPtr hwndCallback);
 
-        [DllImport("user32.dll")]
-        private static extern IntPtr SetWindowsHookEx(int idHook, LowLevelKeyboardProc lpfn, IntPtr hMod, uint dwThreadId);
-
-        [DllImport("user32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool UnhookWindowsHookEx(IntPtr hhk);
-
-        [DllImport("user32.dll")]
-        private static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
-
-        [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        private static extern IntPtr GetModuleHandle(string lpModuleName);
-
         [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
         static extern uint RegisterWindowMessage(string lpString);
 
@@ -71,8 +58,6 @@ namespace RasFocusPro
         // Constants
         private const int SW_MINIMIZE = 6;
         private const int SW_RESTORE = 9;
-        private const int WH_KEYBOARD_LL = 13;
-        private const int WM_KEYDOWN = 0x0100;
         private const byte VK_CONTROL = 0x11;
         private const uint KEYEVENTF_KEYUP = 0x0002;
         private const int HWND_BROADCAST = 0xffff;
@@ -127,12 +112,6 @@ namespace RasFocusPro
         private Window eyeFilterWarm = null;
 
         private System.Windows.Forms.NotifyIcon trayIcon;
-
-        private delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
-        private static LowLevelKeyboardProc _proc;
-        private static IntPtr _hookID = IntPtr.Zero;
-        private static string globalKeyBuffer = "";
-        private static MainWindow _instance; 
         private static Mutex _mutex = null;
 
         // 100% Safe App Directory Finder
@@ -153,13 +132,15 @@ namespace RasFocusPro
         {
             try
             {
+                // CRASH FIX: App will not shutdown when hidden
                 if (Application.Current != null)
                 {
                     Application.Current.ShutdownMode = ShutdownMode.OnExplicitShutdown;
                 }
 
+                // Single Instance Check
                 bool createdNew = false;
-                try { _mutex = new Mutex(true, "RasFocusPro_Mutex_V57", out createdNew); }
+                try { _mutex = new Mutex(true, "RasFocusPro_Mutex_FinalV1", out createdNew); }
                 catch (AbandonedMutexException) { createdNew = true; } 
 
                 if (!createdNew)
@@ -172,7 +153,6 @@ namespace RasFocusPro
                 }
 
                 InitializeComponent();
-                _instance = this;
                 this.Title = "RasFocus Pro";
                 
                 this.Loaded += MainWindow_Loaded;
@@ -195,9 +175,6 @@ namespace RasFocusPro
                 RefreshRunningApps();
                 SetupTrayIcon();
                 SetupEyeFilters(); 
-
-                _proc = HookCallback;
-                _hookID = SetHook(_proc);
 
                 fastTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
                 fastTimer.Tick += FastLoop_Tick;
@@ -287,7 +264,6 @@ namespace RasFocusPro
 
         protected override void OnClosed(EventArgs e)
         {
-            UnhookWindowsHookEx(_hookID);
             if (trayIcon != null) trayIcon.Dispose();
             base.OnClosed(e);
             Application.Current.Shutdown();
@@ -422,7 +398,7 @@ namespace RasFocusPro
         private void PresetNight_Click(object sender, RoutedEventArgs e) { SliderBrightness.Value = 60; SliderWarmth.Value = 75; ApplyEyeFiltersRealtime(); }
 
         // ==========================================
-        // BACKGROUND LOGIC (TIMERS)
+        // BACKGROUND LOGIC (TIMERS) - SAFE SCANNER
         // ==========================================
         private void RefreshRunningApps()
         {
@@ -438,75 +414,89 @@ namespace RasFocusPro
 
         private void FastLoop_Tick(object sender, EventArgs e)
         {
-            if (!blockAdult && !blockReels && !blockShorts && !isSessionActive) return;
-            if (overlayWindow != null && overlayWindow.IsVisible) return;
-
-            IntPtr hWnd = GetForegroundWindow();
-            if (hWnd != IntPtr.Zero)
+            try
             {
-                StringBuilder title = new StringBuilder(512);
-                GetWindowText(hWnd, title, 512);
-                string sTitle = title.ToString().ToLower();
+                if (!blockAdult && !blockReels && !blockShorts && !isSessionActive) return;
+                if (overlayWindow != null && overlayWindow.IsVisible) return;
 
-                if (blockAdult && explicitKeywords.Any(k => sTitle.Contains(k))) { CloseWindowNatively(hWnd); ShowOverlay(GetRandomQuote(1)); return; }
-                if (blockReels && sTitle.Contains("facebook") && sTitle.Contains("reels")) { CloseWindowNatively(hWnd); ShowOverlay(GetRandomQuote(2)); return; }
-                if (blockShorts && sTitle.Contains("youtube") && sTitle.Contains("shorts")) { CloseWindowNatively(hWnd); ShowOverlay(GetRandomQuote(2)); return; }
-
-                if (isSessionActive)
+                IntPtr hWnd = GetForegroundWindow();
+                if (hWnd != IntPtr.Zero)
                 {
-                    bool isBrowser = sTitle.Contains("chrome") || sTitle.Contains("edge") || sTitle.Contains("firefox") || sTitle.Contains("brave");
-                    if (isBrowser)
+                    StringBuilder title = new StringBuilder(512);
+                    GetWindowText(hWnd, title, 512);
+                    string sTitle = title.ToString().ToLower();
+
+                    // KEYLOGGER এর বদলে এখন উইন্ডোর টাইটেল লাইভ স্ক্যান করা হচ্ছে
+                    if (blockAdult && explicitKeywords.Any(k => sTitle.Contains(k))) 
+                    { 
+                        CloseWindowNatively(hWnd); 
+                        ShowOverlay(GetRandomQuote(1)); 
+                        return; 
+                    }
+                    if (blockReels && sTitle.Contains("facebook") && sTitle.Contains("reels")) { CloseWindowNatively(hWnd); ShowOverlay(GetRandomQuote(2)); return; }
+                    if (blockShorts && sTitle.Contains("youtube") && sTitle.Contains("shorts")) { CloseWindowNatively(hWnd); ShowOverlay(GetRandomQuote(2)); return; }
+
+                    if (isSessionActive)
                     {
-                        if (useAllowMode)
+                        bool isBrowser = sTitle.Contains("chrome") || sTitle.Contains("edge") || sTitle.Contains("firefox") || sTitle.Contains("brave");
+                        if (isBrowser)
                         {
-                            if (!allowedWebs.Any(w => sTitle.Contains(w.ToLower())) && !sTitle.Contains("allowed websites"))
+                            if (useAllowMode)
                             {
-                                CloseWindowNatively(hWnd); ShowOverlay("Website not in Allow List!");
+                                if (!allowedWebs.Any(w => sTitle.Contains(w.ToLower())) && !sTitle.Contains("allowed websites"))
+                                {
+                                    CloseWindowNatively(hWnd); ShowOverlay("Website not in Allow List!");
+                                }
                             }
-                        }
-                        else
-                        {
-                            if (blockedWebs.Any(w => sTitle.Contains(w.ToLower())))
+                            else
                             {
-                                CloseWindowNatively(hWnd); ShowOverlay("Website Blocked by Focus Mode!");
+                                if (blockedWebs.Any(w => sTitle.Contains(w.ToLower())))
+                                {
+                                    CloseWindowNatively(hWnd); ShowOverlay("Website Blocked by Focus Mode!");
+                                }
                             }
                         }
                     }
                 }
             }
+            catch { }
         }
 
         private void SlowLoop_Tick(object sender, EventArgs e)
         {
-            ApplyEyeFiltersRealtime();
-            if (!isSessionActive) return;
-
-            if (isPomodoroMode)
+            try
             {
-                pomoTicks++;
-                int totalMins = isPomodoroBreak ? 5 : pomoLengthMin;
-                int left = (totalMins * 60) - pomoTicks;
-                if (left < 0) left = 0;
+                ApplyEyeFiltersRealtime();
+                if (!isSessionActive) return;
 
-                if (!isPomodoroBreak && pomoTicks >= pomoLengthMin * 60)
+                if (isPomodoroMode)
                 {
-                    isPomodoroBreak = true; pomoTicks = 0;
-                    ShowOverlay("☕ Time to Rest & Drink Water! Break Started.");
+                    pomoTicks++;
+                    int totalMins = isPomodoroBreak ? 5 : pomoLengthMin;
+                    int left = (totalMins * 60) - pomoTicks;
+                    if (left < 0) left = 0;
+
+                    if (!isPomodoroBreak && pomoTicks >= pomoLengthMin * 60)
+                    {
+                        isPomodoroBreak = true; pomoTicks = 0;
+                        ShowOverlay("☕ Time to Rest & Drink Water! Break Started.");
+                    }
+                }
+
+                foreach (Process p in Process.GetProcesses())
+                {
+                    try
+                    {
+                        string pName = p.ProcessName.ToLower() + ".exe";
+                        if (pName == "taskmgr.exe" || pName == "msiexec.exe") { p.Kill(); continue; } 
+
+                        if (useAllowMode) { if (!systemApps.Contains(pName) && !allowedApps.Contains(pName)) p.Kill(); }
+                        else { if (blockedApps.Contains(pName)) p.Kill(); }
+                    }
+                    catch { }
                 }
             }
-
-            foreach (Process p in Process.GetProcesses())
-            {
-                try
-                {
-                    string pName = p.ProcessName.ToLower() + ".exe";
-                    if (pName == "taskmgr.exe" || pName == "msiexec.exe") { p.Kill(); continue; } 
-
-                    if (useAllowMode) { if (!systemApps.Contains(pName) && !allowedApps.Contains(pName)) p.Kill(); }
-                    else { if (blockedApps.Contains(pName)) p.Kill(); }
-                }
-                catch { }
-            }
+            catch { }
         }
 
         private void SyncLoop_Tick(object sender, EventArgs e)
@@ -536,26 +526,34 @@ namespace RasFocusPro
 
         private void CloseWindowNatively(IntPtr hWnd)
         {
-            SetForegroundWindow(hWnd);
-            keybd_event(VK_CONTROL, 0, 0, UIntPtr.Zero);
-            keybd_event((byte)'W', 0, 0, UIntPtr.Zero);
-            keybd_event((byte)'W', 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
-            keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
-            Thread.Sleep(50); ShowWindow(hWnd, SW_MINIMIZE);
+            try
+            {
+                SetForegroundWindow(hWnd);
+                keybd_event(VK_CONTROL, 0, 0, UIntPtr.Zero);
+                keybd_event((byte)'W', 0, 0, UIntPtr.Zero);
+                keybd_event((byte)'W', 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+                keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+                Thread.Sleep(50); ShowWindow(hWnd, SW_MINIMIZE);
+            }
+            catch { }
         }
 
         private void ShowOverlay(string message)
         {
-            if (overlayWindow == null)
+            try
             {
-                overlayWindow = new Window { WindowStyle = WindowStyle.None, AllowsTransparency = true, Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(240, 9, 61, 31)), Topmost = true, Width = 800, Height = 300, WindowStartupLocation = WindowStartupLocation.CenterScreen };
-                TextBlock tb = new TextBlock { Text = message, Foreground = System.Windows.Media.Brushes.White, FontSize = 24, FontWeight = FontWeights.Bold, HorizontalAlignment = System.Windows.HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center, Margin = new Thickness(20) };
-                overlayWindow.Content = tb;
+                if (overlayWindow == null)
+                {
+                    overlayWindow = new Window { WindowStyle = WindowStyle.None, AllowsTransparency = true, Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(240, 9, 61, 31)), Topmost = true, Width = 800, Height = 300, WindowStartupLocation = WindowStartupLocation.CenterScreen };
+                    TextBlock tb = new TextBlock { Text = message, Foreground = System.Windows.Media.Brushes.White, FontSize = 24, FontWeight = FontWeights.Bold, HorizontalAlignment = System.Windows.HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center, Margin = new Thickness(20) };
+                    overlayWindow.Content = tb;
+                }
+                else { ((TextBlock)overlayWindow.Content).Text = message; }
+                overlayWindow.Show(); overlayWindow.Topmost = true;
+                DispatcherTimer t = new DispatcherTimer { Interval = TimeSpan.FromSeconds(6) };
+                t.Tick += (s, ev) => { overlayWindow.Hide(); t.Stop(); }; t.Start();
             }
-            else { ((TextBlock)overlayWindow.Content).Text = message; }
-            overlayWindow.Show(); overlayWindow.Topmost = true;
-            DispatcherTimer t = new DispatcherTimer { Interval = TimeSpan.FromSeconds(6) };
-            t.Tick += (s, ev) => { overlayWindow.Hide(); t.Stop(); }; t.Start();
+            catch { }
         }
 
         private void SetupEyeFilters()
@@ -599,50 +597,6 @@ namespace RasFocusPro
         {
             isSessionActive = false; isPassMode = false; isPomodoroMode = false; currentSessionPass = "";
             SaveData(); UpdateUIStates(); ManageFocusSound(false);
-        }
-
-        // ==========================================
-        // REAL-TIME KEYBOARD HOOK (ULTIMATE SAFE FIX)
-        // ==========================================
-        private static IntPtr SetHook(LowLevelKeyboardProc proc)
-        {
-            try
-            {
-                // 완전히 Safe mode for Single-File publish. Using IntPtr.Zero directly.
-                return SetWindowsHookEx(WH_KEYBOARD_LL, proc, IntPtr.Zero, 0);
-            }
-            catch { return IntPtr.Zero; }
-        }
-
-        private static IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
-        {
-            try
-            {
-                if (nCode >= 0 && wParam == (IntPtr)WM_KEYDOWN && _instance != null && _instance.blockAdult)
-                {
-                    int vkCode = Marshal.ReadInt32(lParam);
-                    char c = (char)vkCode;
-                    if (char.IsLetterOrDigit(c) || char.IsPunctuation(c))
-                    {
-                        globalKeyBuffer += char.ToLower(c);
-                        if (globalKeyBuffer.Length > 50) globalKeyBuffer = globalKeyBuffer.Substring(1);
-
-                        foreach (string kw in _instance.explicitKeywords)
-                        {
-                            if (globalKeyBuffer.Contains(kw))
-                            {
-                                globalKeyBuffer = ""; 
-                                IntPtr hActive = GetForegroundWindow();
-                                if (hActive != IntPtr.Zero) _instance.CloseWindowNatively(hActive);
-                                _instance.ShowOverlay(_instance.GetRandomQuote(1));
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-            catch { }
-            return CallNextHookEx(_hookID, nCode, wParam, lParam);
         }
 
         // ==========================================
