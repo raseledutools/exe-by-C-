@@ -21,7 +21,7 @@ namespace RasFocusPro
     public partial class MainWindow : Window
     {
         // ==========================================
-        // WINDOWS NATIVE API (P/Invoke) - 100% SAFE
+        // WINDOWS NATIVE API (P/Invoke)
         // ==========================================
         [DllImport("user32.dll")]
         private static extern IntPtr GetForegroundWindow();
@@ -125,34 +125,24 @@ namespace RasFocusPro
                 }
 
                 // ========================================================
-                // CRASH FIX: GHOST KILLER & SAFE SINGLE INSTANCE SYSTEM
+                // ULTIMATE CRASH-FREE SINGLE INSTANCE CHECK
                 // ========================================================
                 Process currentProcess = Process.GetCurrentProcess();
                 Process[] runningProcesses = Process.GetProcessesByName(currentProcess.ProcessName);
 
                 if (runningProcesses.Length > 1)
                 {
+                    // যদি আগে থেকেই অ্যাপ চলে, তবে আগের উইন্ডো খুঁজে বের করে সামনে আনবে
                     IntPtr hWnd = FindWindow(null, "RasFocus Pro");
                     if (hWnd != IntPtr.Zero)
                     {
-                        // অ্যাপটি সত্যি সত্যিই চলছে, তাই আগের উইন্ডো সামনে এনে নতুনটি বন্ধ করে দাও
                         ShowWindow(hWnd, SW_RESTORE);
                         SetForegroundWindow(hWnd);
-                        Environment.Exit(0);
-                        return;
                     }
-                    else
-                    {
-                        // অ্যাপটি আগে ক্র্যাশ করেছিল কিন্তু ব্যাকগ্রাউন্ডে অদৃশ্য ভূত হয়ে আটকে আছে।
-                        // এই ভূতের কারণেই অ্যাপ রান হচ্ছিল না! তাই সব ভূত কিল করো!
-                        foreach (Process p in runningProcesses)
-                        {
-                            if (p.Id != currentProcess.Id)
-                            {
-                                try { p.Kill(); } catch { }
-                            }
-                        }
-                    }
+                    
+                    // কোনো মেসেজ বা ইভেন্ট ট্রিগার না করেই ডিরেক্ট কিল করে দেবে (No Crash)
+                    Environment.Exit(0);
+                    return;
                 }
 
                 InitializeComponent();
@@ -160,7 +150,7 @@ namespace RasFocusPro
                 
                 this.Loaded += MainWindow_Loaded;
             }
-            catch (Exception) { /* Silent fail to prevent startup crash */ }
+            catch (Exception) { /* Silent fail */ }
         }
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -384,7 +374,7 @@ namespace RasFocusPro
         private void PresetNight_Click(object sender, RoutedEventArgs e) { SliderBrightness.Value = 60; SliderWarmth.Value = 75; ApplyEyeFiltersRealtime(); }
 
         // ==========================================
-        // BACKGROUND LOGIC (TIMERS) - SAFE WINDOW SCANNER
+        // BACKGROUND LOGIC (TIMERS)
         // ==========================================
         private void RefreshRunningApps()
         {
