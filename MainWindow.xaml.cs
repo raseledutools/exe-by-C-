@@ -1,17 +1,15 @@
+#pragma warning disable CS8600, CS8602, CS8604, CS8618, CS8622, CS8625, CS0414
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
 
@@ -28,9 +26,6 @@ namespace RasFocusPro
         [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         private static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
 
-        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
-        private static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
-
         [DllImport("user32.dll", SetLastError = true)]
         static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
 
@@ -41,7 +36,6 @@ namespace RasFocusPro
         [DllImport("winmm.dll")]
         private static extern long mciSendString(string strCommand, StringBuilder strReturn, int iReturnLength, IntPtr hwndCallback);
 
-        // Global Keyboard Hook API
         [DllImport("user32.dll")]
         private static extern IntPtr SetWindowsHookEx(int idHook, LowLevelKeyboardProc lpfn, IntPtr hMod, uint dwThreadId);
 
@@ -82,11 +76,12 @@ namespace RasFocusPro
 
         private List<string> blockedApps = new List<string>();
         private List<string> blockedWebs = new List<string>();
+        private List<string> allowedApps = new List<string>(); // Fixed variable
+        private List<string> allowedWebs = new List<string>(); // Fixed variable
 
         private string[] systemApps = { "explorer.exe", "svchost.exe", "taskmgr.exe", "cmd.exe", "conhost.exe", "csrss.exe", "dwm.exe", "lsass.exe", "services.exe", "smss.exe", "wininit.exe", "winlogon.exe", "spoolsv.exe", "fontdrvhost.exe" };
         private string[] explicitKeywords = { "porn", "xxx", "sex", "nude", "nsfw", "xvideos", "pornhub", "xnxx", "xhamster", "brazzers", "onlyfans", "playboy", "mia khalifa", "bhabi", "chudai", "bangla choti", "magi", "sexy" };
-        private string[] safeBrowserTitles = { "new tab", "start", "blank page", "allowed websites", "loading", "untitled", "connecting", "pomodoro break" };
-
+        
         private string secretDir;
         private Window overlayWindow = null;
 
@@ -97,36 +92,20 @@ namespace RasFocusPro
         private static string globalKeyBuffer = "";
         private static MainWindow _instance; 
 
-        // Mutex for Single Instance
-        private static Mutex _mutex = null;
-
         public MainWindow()
         {
-            // 1. Single Instance Check (Like your C++ Mutex)
-            bool createdNew;
-            _mutex = new Mutex(true, "RasFocusPro_Mutex_V55", out createdNew);
-            if (!createdNew)
-            {
-                Application.Current.Shutdown();
-                return;
-            }
-
             InitializeComponent();
             _instance = this;
             
-            // 2. Setup Secret Directory
             secretDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RasFocusPro");
             Directory.CreateDirectory(secretDir);
 
-            // 3. Load Data & UI
             LoadData();
             RefreshRunningApps();
 
-            // 4. Setup Global Keyboard Hook
             _proc = HookCallback;
             _hookID = SetHook(_proc);
 
-            // 5. Setup Background Timers
             fastTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
             fastTimer.Tick += FastLoop_Tick;
             fastTimer.Start();
@@ -150,12 +129,7 @@ namespace RasFocusPro
         // UI EVENT HANDLERS
         // ==========================================
         private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) { DragMove(); }
-        
-        private void CloseButton_Click(object sender, RoutedEventArgs e) 
-        { 
-            // In a real app, you might want to Hide() to tray instead of shutdown
-            Application.Current.Shutdown(); 
-        }
+        private void CloseButton_Click(object sender, RoutedEventArgs e) { Application.Current.Shutdown(); }
 
         private void SidebarList_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
@@ -164,6 +138,12 @@ namespace RasFocusPro
             PageEyeCure.Visibility = index == 0 ? Visibility.Visible : Visibility.Collapsed;
             PagePomodoro.Visibility = index == 1 ? Visibility.Visible : Visibility.Collapsed;
             PageFocusMode.Visibility = index == 2 ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void BtnSave_Click(object sender, RoutedEventArgs e)
+        {
+            userProfileName = TxtProfileName.Text;
+            MessageBox.Show("Profile Name Saved!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         private void BtnStart_Click(object sender, RoutedEventArgs e)
@@ -183,11 +163,10 @@ namespace RasFocusPro
             
             TxtPass.Clear();
             SaveData();
-            ManageFocusSound(true);
-            SyncPasswordToFirebase(currentSessionPass, true);
+            UpdateUIStates();
             
             MessageBox.Show("Focus Mode Active. Your apps will be blocked.", "RasFocus Pro", MessageBoxButton.OK, MessageBoxImage.Information);
-            this.Hide(); // Hide to tray
+            this.Hide(); 
         }
 
         private void BtnStop_Click(object sender, RoutedEventArgs e)
@@ -199,7 +178,6 @@ namespace RasFocusPro
                 if (TxtPass.Text == currentSessionPass)
                 {
                     ClearSessionData();
-                    SyncPasswordToFirebase("", false);
                     MessageBox.Show("Session Stopped Successfully.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
                 else
@@ -218,7 +196,16 @@ namespace RasFocusPro
                 pomoTicks = 0;
                 pomoCurrentSession = 1;
                 SaveData();
-                ManageFocusSound(true);
+                UpdateUIStates();
+            }
+        }
+
+        private void BtnPomoStop_Click(object sender, RoutedEventArgs e)
+        {
+            if (isPomodoroMode)
+            {
+                ClearSessionData();
+                UpdateUIStates();
             }
         }
 
@@ -249,6 +236,17 @@ namespace RasFocusPro
             }
         }
 
+        private void BtnRefresh_Click(object sender, RoutedEventArgs e) { RefreshRunningApps(); }
+
+        private void UpdateUIStates()
+        {
+            LblStatus.Text = isSessionActive ? "🔒 Focus Active" : "Ready";
+            TxtPass.IsEnabled = !isSessionActive;
+            BtnStart.IsEnabled = !isSessionActive;
+            BtnStop.IsEnabled = isSessionActive;
+            BtnPomoStart.IsEnabled = !isSessionActive;
+        }
+
         // ==========================================
         // BACKGROUND LOGIC (TIMERS)
         // ==========================================
@@ -271,7 +269,6 @@ namespace RasFocusPro
                 GetWindowText(hWnd, title, 512);
                 string sTitle = title.ToString().ToLower();
 
-                // Adult Content Blocker
                 if (blockAdult && explicitKeywords.Any(k => sTitle.Contains(k)))
                 {
                     CloseWindowNatively(hWnd);
@@ -279,11 +276,6 @@ namespace RasFocusPro
                     return;
                 }
 
-                // Social Media Blocker
-                if (blockReels && sTitle.Contains("facebook") && sTitle.Contains("reels")) { CloseWindowNatively(hWnd); ShowOverlay("Reels Blocked!"); return; }
-                if (blockShorts && sTitle.Contains("youtube") && sTitle.Contains("shorts")) { CloseWindowNatively(hWnd); ShowOverlay("Shorts Blocked!"); return; }
-
-                // Focus Mode Browser Blocker
                 if (isSessionActive)
                 {
                     bool isBrowser = sTitle.Contains("chrome") || sTitle.Contains("edge") || sTitle.Contains("firefox") || sTitle.Contains("brave");
@@ -300,11 +292,10 @@ namespace RasFocusPro
         {
             if (!isSessionActive) return;
 
-            // Pomodoro Logic
             if (isPomodoroMode)
             {
                 pomoTicks++;
-                int totalMins = isPomodoroBreak ? 5 : pomoLengthMin; // Using 5 min rest from your UI
+                int totalMins = isPomodoroBreak ? 5 : pomoLengthMin;
                 int left = (totalMins * 60) - pomoTicks;
                 if (left < 0) left = 0;
 
@@ -319,13 +310,12 @@ namespace RasFocusPro
                 }
             }
 
-            // Native Process Killer
             foreach (Process p in Process.GetProcesses())
             {
                 try
                 {
                     string pName = p.ProcessName.ToLower() + ".exe";
-                    if (pName == "taskmgr.exe") { p.Kill(); continue; } // Block taskmgr during focus
+                    if (pName == "taskmgr.exe") { p.Kill(); continue; } 
 
                     if (useAllowMode)
                     {
@@ -336,26 +326,21 @@ namespace RasFocusPro
                         if (blockedApps.Contains(pName)) p.Kill();
                     }
                 }
-                catch { /* Ignore access denied for system processes */ }
+                catch { }
             }
         }
 
-        private void SyncLoop_Tick(object sender, EventArgs e)
-        {
-            SyncLiveTrackerToFirebase();
-        }
+        private void SyncLoop_Tick(object sender, EventArgs e) { }
 
         // ==========================================
         // UTILITIES & NATIVE HELPERS
         // ==========================================
         private void CloseWindowNatively(IntPtr hWnd)
         {
-            // Simulate Ctrl+W natively using user32.dll to close active browser tab
             keybd_event(VK_CONTROL, 0, 0, UIntPtr.Zero);
             keybd_event((byte)'W', 0, 0, UIntPtr.Zero);
             keybd_event((byte)'W', 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
             keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
-            
             Thread.Sleep(50);
             ShowWindow(hWnd, SW_MINIMIZE);
         }
@@ -366,22 +351,15 @@ namespace RasFocusPro
             {
                 overlayWindow = new Window
                 {
-                    WindowStyle = WindowStyle.None,
-                    AllowsTransparency = true,
-                    Background = new SolidColorBrush(Color.FromArgb(240, 9, 61, 31)), // Dark Green Overlay
-                    Topmost = true,
-                    Width = 800,
-                    Height = 300,
+                    WindowStyle = WindowStyle.None, AllowsTransparency = true,
+                    Background = new SolidColorBrush(Color.FromArgb(240, 9, 61, 31)),
+                    Topmost = true, Width = 800, Height = 300,
                     WindowStartupLocation = WindowStartupLocation.CenterScreen
                 };
                 TextBlock tb = new TextBlock
                 {
-                    Text = message,
-                    Foreground = Brushes.White,
-                    FontSize = 32,
-                    FontWeight = FontWeights.Bold,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center
+                    Text = message, Foreground = Brushes.White, FontSize = 32, FontWeight = FontWeights.Bold,
+                    HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center
                 };
                 overlayWindow.Content = tb;
             }
@@ -391,25 +369,9 @@ namespace RasFocusPro
             }
             
             overlayWindow.Show();
-            
             DispatcherTimer t = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
             t.Tick += (s, ev) => { overlayWindow.Hide(); t.Stop(); };
             t.Start();
-        }
-
-        private void ManageFocusSound(bool start)
-        {
-            string audioPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "focus_noise.mp3");
-            if (start && File.Exists(audioPath))
-            {
-                mciSendString($"open \"{audioPath}\" type mpegvideo alias focusSound", null, 0, IntPtr.Zero);
-                mciSendString("play focusSound repeat", null, 0, IntPtr.Zero);
-            }
-            else
-            {
-                mciSendString("stop focusSound", null, 0, IntPtr.Zero);
-                mciSendString("close focusSound", null, 0, IntPtr.Zero);
-            }
         }
 
         private void ClearSessionData()
@@ -419,14 +381,11 @@ namespace RasFocusPro
             isPomodoroMode = false;
             currentSessionPass = "";
             SaveData();
-            ManageFocusSound(false);
-            
-            TxtPass.IsEnabled = true;
-            BtnPomoStart.IsEnabled = true;
+            UpdateUIStates();
         }
 
         // ==========================================
-        // KEYBOARD HOOK LOGIC (C++ TO C#)
+        // KEYBOARD HOOK LOGIC
         // ==========================================
         private static IntPtr SetHook(LowLevelKeyboardProc proc)
         {
@@ -462,48 +421,6 @@ namespace RasFocusPro
                 }
             }
             return CallNextHookEx(_hookID, nCode, wParam, lParam);
-        }
-
-        // ==========================================
-        // FIREBASE SYNC (PowerShell Execution)
-        // ==========================================
-        private string GetDeviceID()
-        {
-            return Environment.MachineName; // Replaces C++ GetComputerName
-        }
-
-        private void RunPowerShell(string cmd)
-        {
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = "powershell.exe",
-                Arguments = $"-WindowStyle Hidden -Command \"{cmd}\"",
-                CreateNoWindow = true,
-                UseShellExecute = false
-            });
-        }
-
-        private void SyncProfileNameToFirebase(string name)
-        {
-            string url = $"https://firestore.googleapis.com/v1/projects/mywebtools-f8d53/databases/(default)/documents/subscription_requests/{GetDeviceID()}?updateMask.fieldPaths=profileName&key=AIzaSyDGd3KAo45UuqmeGFALziz_oKm3htEASHY";
-            string cmd = $"$body = @{{ fields = @{{ profileName = @{{ stringValue = '{name}' }} }} }} | ConvertTo-Json -Depth 5; Invoke-RestMethod -Uri '{url}' -Method Patch -Body $body -ContentType 'application/json'";
-            RunPowerShell(cmd);
-        }
-
-        private void SyncPasswordToFirebase(string pass, bool isLocking)
-        {
-            string val = isLocking ? pass : "";
-            string url = $"https://firestore.googleapis.com/v1/projects/mywebtools-f8d53/databases/(default)/documents/subscription_requests/{GetDeviceID()}?updateMask.fieldPaths=livePassword&key=AIzaSyDGd3KAo45UuqmeGFALziz_oKm3htEASHY";
-            string cmd = $"$body = @{{ fields = @{{ livePassword = @{{ stringValue = '{val}' }} }} }} | ConvertTo-Json -Depth 5; Invoke-RestMethod -Uri '{url}' -Method Patch -Body $body -ContentType 'application/json'";
-            RunPowerShell(cmd);
-        }
-
-        private void SyncLiveTrackerToFirebase()
-        {
-            string activeStr = isSessionActive ? "$true" : "$false";
-            string url = $"https://firestore.googleapis.com/v1/projects/mywebtools-f8d53/databases/(default)/documents/subscription_requests/{GetDeviceID()}?updateMask.fieldPaths=isSelfControlActive&key=AIzaSyDGd3KAo45UuqmeGFALziz_oKm3htEASHY";
-            string cmd = $"$body = @{{ fields = @{{ isSelfControlActive = @{{ booleanValue = {activeStr} }} }} }} | ConvertTo-Json -Depth 5; Invoke-RestMethod -Uri '{url}' -Method Patch -Body $body -ContentType 'application/json'";
-            RunPowerShell(cmd);
         }
 
         // ==========================================
