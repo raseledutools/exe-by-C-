@@ -13,8 +13,6 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
-using System.Drawing;
-using System.Windows.Forms;
 
 namespace RasFocusPro
 {
@@ -25,6 +23,11 @@ namespace RasFocusPro
         // ==========================================
         [DllImport("user32.dll")]
         private static extern IntPtr GetForegroundWindow();
+
+        // এটি যুক্ত করা হয়েছে SetForegroundWindow এরর ফিক্স করার জন্য
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
 
         [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         private static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
@@ -119,7 +122,8 @@ namespace RasFocusPro
         private Window eyeFilterDim = null;
         private Window eyeFilterWarm = null;
 
-        private NotifyIcon trayIcon;
+        // System.Windows.Forms.NotifyIcon সরাসরি কল করা হয়েছে কনফ্লিক্ট এড়াতে
+        private System.Windows.Forms.NotifyIcon trayIcon;
 
         // Keyboard Hook Setup
         private delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
@@ -198,16 +202,16 @@ namespace RasFocusPro
         // ==========================================
         private void SetupTrayIcon()
         {
-            trayIcon = new NotifyIcon();
+            trayIcon = new System.Windows.Forms.NotifyIcon();
             string iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "icon.ico");
-            if (File.Exists(iconPath)) { trayIcon.Icon = new Icon(iconPath); }
-            else { trayIcon.Icon = SystemIcons.Shield; }
+            if (File.Exists(iconPath)) { trayIcon.Icon = new System.Drawing.Icon(iconPath); }
+            else { trayIcon.Icon = System.Drawing.SystemIcons.Shield; }
 
             trayIcon.Text = "RasFocus Pro - Focus Manager";
             trayIcon.Visible = true;
             trayIcon.DoubleClick += (s, e) => ShowAppFromTray();
 
-            ContextMenuStrip menu = new ContextMenuStrip();
+            System.Windows.Forms.ContextMenuStrip menu = new System.Windows.Forms.ContextMenuStrip();
             menu.Items.Add("Open RasFocus", null, (s, e) => ShowAppFromTray());
             menu.Items.Add("Exit App", null, (s, e) => 
             {
@@ -242,7 +246,7 @@ namespace RasFocusPro
         private void CloseButton_Click(object sender, RoutedEventArgs e) 
         { 
             this.Hide(); 
-            trayIcon.ShowBalloonTip(2000, "RasFocus Pro", "Running securely in the background...", ToolTipIcon.Info);
+            trayIcon.ShowBalloonTip(2000, "RasFocus Pro", "Running securely in the background...", System.Windows.Forms.ToolTipIcon.Info);
         }
 
         private void SidebarList_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -460,7 +464,7 @@ namespace RasFocusPro
                 };
                 TextBlock tb = new TextBlock
                 {
-                    Text = message, Foreground = Brushes.White, FontSize = 24, FontWeight = FontWeights.Bold,
+                    Text = message, Foreground = System.Windows.Media.Brushes.White, FontSize = 24, FontWeight = FontWeights.Bold,
                     HorizontalAlignment = System.Windows.HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
                     TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center, Margin = new Thickness(20)
                 };
@@ -481,8 +485,8 @@ namespace RasFocusPro
 
         private void SetupEyeFilters()
         {
-            eyeFilterDim = new Window { WindowStyle = WindowStyle.None, AllowsTransparency = true, Background = Brushes.Transparent, Topmost = true, ShowInTaskbar = false, IsHitTestVisible = false, WindowState = WindowState.Maximized };
-            eyeFilterWarm = new Window { WindowStyle = WindowStyle.None, AllowsTransparency = true, Background = Brushes.Transparent, Topmost = true, ShowInTaskbar = false, IsHitTestVisible = false, WindowState = WindowState.Maximized };
+            eyeFilterDim = new Window { WindowStyle = WindowStyle.None, AllowsTransparency = true, Background = System.Windows.Media.Brushes.Transparent, Topmost = true, ShowInTaskbar = false, IsHitTestVisible = false, WindowState = WindowState.Maximized };
+            eyeFilterWarm = new Window { WindowStyle = WindowStyle.None, AllowsTransparency = true, Background = System.Windows.Media.Brushes.Transparent, Topmost = true, ShowInTaskbar = false, IsHitTestVisible = false, WindowState = WindowState.Maximized };
             eyeFilterDim.Show(); eyeFilterWarm.Show();
         }
 
