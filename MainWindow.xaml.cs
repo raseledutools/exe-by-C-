@@ -21,7 +21,7 @@ namespace RasFocusPro
     public partial class MainWindow : Window
     {
         // ==========================================
-        // WINDOWS NATIVE API (P/Invoke) - HOOKS REMOVED FOR SAFETY
+        // WINDOWS NATIVE API (P/Invoke)
         // ==========================================
         [DllImport("user32.dll")]
         private static extern IntPtr GetForegroundWindow();
@@ -32,9 +32,6 @@ namespace RasFocusPro
 
         [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         private static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
-
-        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
-        private static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
 
         [DllImport("user32.dll", SetLastError = true)]
         static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
@@ -103,7 +100,7 @@ namespace RasFocusPro
             "\"লজ্জাশীলতা কল্যাণ ছাড়া আর কিছুই বয়ে আনে না।\" - (সহীহ বুখারী)" 
         };
         private string[] timeQuotes = { 
-            "\"যারা সময়কে মূল্যায়ন করে না, সময়ও তাদেরকে মূল্যায়ন করে না।\" - এ.পি.জে. আবদুল কালাম" 
+            "\"যারা সময়কে মূল্যায়ন করে না, সময়ও তাদেরকে মূল্যায়ন করে গঠন করে না।\" - এ.পি.জে. আবদুল কালাম" 
         };
 
         private string secretDir;
@@ -114,25 +111,12 @@ namespace RasFocusPro
         private System.Windows.Forms.NotifyIcon trayIcon;
         private static Mutex _mutex = null;
 
-        // 100% Safe App Directory Finder
-        private string AppBaseDir 
-        {
-            get 
-            {
-                string path = AppDomain.CurrentDomain.BaseDirectory;
-                if (string.IsNullOrEmpty(path) || path.Contains("Temp"))
-                {
-                    path = Path.GetDirectoryName(Process.GetCurrentProcess().MainModule?.FileName ?? "") ?? @"C:\";
-                }
-                return path;
-            }
-        }
+        private string AppBaseDir => System.AppContext.BaseDirectory;
 
         public MainWindow()
         {
             try
             {
-                // CRASH FIX: App will not shutdown when hidden
                 if (Application.Current != null)
                 {
                     Application.Current.ShutdownMode = ShutdownMode.OnExplicitShutdown;
@@ -140,7 +124,7 @@ namespace RasFocusPro
 
                 // Single Instance Check
                 bool createdNew = false;
-                try { _mutex = new Mutex(true, "RasFocusPro_Mutex_FinalV1", out createdNew); }
+                try { _mutex = new Mutex(true, "RasFocusPro_Mutex_V58", out createdNew); }
                 catch (AbandonedMutexException) { createdNew = true; } 
 
                 if (!createdNew)
@@ -157,7 +141,7 @@ namespace RasFocusPro
                 
                 this.Loaded += MainWindow_Loaded;
             }
-            catch (Exception) { /* Silent fail to prevent startup crash */ }
+            catch (Exception) { /* Silent fail */ }
         }
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -398,7 +382,7 @@ namespace RasFocusPro
         private void PresetNight_Click(object sender, RoutedEventArgs e) { SliderBrightness.Value = 60; SliderWarmth.Value = 75; ApplyEyeFiltersRealtime(); }
 
         // ==========================================
-        // BACKGROUND LOGIC (TIMERS) - SAFE SCANNER
+        // BACKGROUND LOGIC (TIMERS) - SAFE SCANNER (NO HOOKS)
         // ==========================================
         private void RefreshRunningApps()
         {
@@ -426,7 +410,6 @@ namespace RasFocusPro
                     GetWindowText(hWnd, title, 512);
                     string sTitle = title.ToString().ToLower();
 
-                    // KEYLOGGER এর বদলে এখন উইন্ডোর টাইটেল লাইভ স্ক্যান করা হচ্ছে
                     if (blockAdult && explicitKeywords.Any(k => sTitle.Contains(k))) 
                     { 
                         CloseWindowNatively(hWnd); 
@@ -626,10 +609,14 @@ namespace RasFocusPro
                 } catch { }
             };
             
-            loadList("bl_app.txt", blockedApps, ListBlockedApps);
-            loadList("bl_web.txt", blockedWebs, ListBlockedWebs);
-            loadList("al_app.txt", allowedApps, ListAllowApps);
-            loadList("al_web.txt", allowedWebs, ListAllowWebs);
+            try
+            {
+                loadList("bl_app.txt", blockedApps, ListBlockedApps);
+                loadList("bl_web.txt", blockedWebs, ListBlockedWebs);
+                loadList("al_app.txt", allowedApps, ListAllowApps);
+                loadList("al_web.txt", allowedWebs, ListAllowWebs);
+            }
+            catch { }
         }
     }
 }
