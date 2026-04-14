@@ -206,7 +206,6 @@
                 </StackPanel>
 
                 <StackPanel x:Name="PageEyeCure" Grid.Row="1" Margin="50,20,50,40" Visibility="Visible">
-                    
                     <Grid Margin="0,0,0,40">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
@@ -227,10 +226,8 @@
                             <RowDefinition Height="50"/>
                             <RowDefinition Height="50"/>
                         </Grid.RowDefinitions>
-
                         <TextBlock Grid.Row="0" Grid.Column="0" Text="Warm" VerticalAlignment="Center" FontSize="15" Foreground="#333"/>
                         <Slider Grid.Row="0" Grid.Column="1" Maximum="100" Value="60" VerticalAlignment="Center" Margin="10,0"/>
-
                         <TextBlock Grid.Row="1" Grid.Column="0" Text="Dimmer" VerticalAlignment="Center" FontSize="15" Foreground="#333"/>
                         <Slider Grid.Row="1" Grid.Column="1" Maximum="100" Value="68" VerticalAlignment="Center" Margin="10,0"/>
                     </Grid>
@@ -271,7 +268,6 @@
                                     <Button x:Name="BtnPomoStart" Content="START" Style="{StaticResource CoralBtn}" FontSize="22" Padding="60,12" Click="BtnPomoStart_Click"/>
                                 </StackPanel>
                             </Border>
-
                             <StackPanel Margin="40,30">
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
                                     <TextBlock Text="Pomodoro Technique Mode" FontSize="16" Foreground="#555" VerticalAlignment="Center" Width="250"/>
@@ -286,7 +282,9 @@
                                     <TextBlock Text="Rest Duration" FontSize="16" Foreground="#555" VerticalAlignment="Center" Width="250"/>
                                     <TextBox Text="5" Width="60" TextAlignment="Center"/>
                                     <TextBlock Text="Minutes" FontSize="15" Foreground="#555" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                                    <Button x:Name="BtnPomoStop" Content="Stop Timer" Background="Transparent" Foreground="#EF4444" BorderThickness="0" FontSize="16" FontWeight="Bold" Cursor="Hand" Margin="20,0,0,0" Click="BtnPomoStop_Click"/>
                                 </StackPanel>
+                                <TextBlock x:Name="LblPomoStatus" Text="Ready" Margin="0,20,0,0" FontWeight="Bold" Foreground="#15AABF" HorizontalAlignment="Center" />
                             </StackPanel>
                         </StackPanel>
                     </Border>
@@ -297,12 +295,16 @@
                     
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
                         <TextBlock Text="Profile:" VerticalAlignment="Center" FontSize="15" FontWeight="Bold" Foreground="#555" Margin="0,0,10,0"/>
-                        <TextBox Width="180" Margin="0,0,15,0" Text="Rasel Mia"/>
-                        <Button Content="Save" Style="{StaticResource TealBtn}" Padding="15,6"/>
-                        
-                        <TextBlock Text="Friend Pass:" VerticalAlignment="Center" FontSize="15" FontWeight="Bold" Foreground="#555" Margin="30,0,10,0"/>
-                        <TextBox Width="120" Margin="0,0,20,0"/>
-                        <Button Content="LOCK DEVICE" Style="{StaticResource CoralBtn}" Padding="20,6" Click="BtnStart_Click"/>
+                        <TextBox x:Name="TxtProfileName" Width="180" Margin="0,0,15,0" Text="Rasel Mia"/>
+                        <Button Content="Save" Style="{StaticResource TealBtn}" Padding="15,6" Click="BtnSave_Click"/>
+                        <TextBlock x:Name="LblStatus" Text="Ready" VerticalAlignment="Center" FontWeight="Bold" Foreground="#15AABF" Margin="20,0,0,0" />
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+                        <TextBlock Text="Friend Pass:" VerticalAlignment="Center" FontSize="15" FontWeight="Bold" Foreground="#555" Margin="0,0,10,0"/>
+                        <TextBox x:Name="TxtPass" Width="120" Margin="0,0,20,0"/>
+                        <Button x:Name="BtnStart" Content="LOCK DEVICE" Style="{StaticResource CoralBtn}" Padding="20,6" Click="BtnStart_Click"/>
+                        <Button x:Name="BtnStop" Content="STOP" Style="{StaticResource TealBtn}" Background="#64748B" Margin="10,0,0,0" Click="BtnStop_Click"/>
                     </StackPanel>
 
                     <WrapPanel Margin="0,0,0,20">
@@ -325,7 +327,7 @@
                                     <TextBox x:Name="TxtAppAdd" Width="180" Margin="0,0,10,0"/>
                                     <Button Content="Add" Style="{StaticResource TealBtn}" Padding="15,5" Click="BtnAddApp_Click"/>
                                 </StackPanel>
-                                <ListBox x:Name="ListBlockedApps" Height="220" BorderBrush="#CBD5E1" FontSize="15" Foreground="#333"/>
+                                <ListBox x:Name="ListBlockedApps" Height="170" BorderBrush="#CBD5E1" FontSize="15" Foreground="#333"/>
                                 <Button Content="Remove Selected" Background="#EF4444" Foreground="White" BorderThickness="0" Padding="10" Margin="0,10,0,0" Cursor="Hand" Click="BtnRemoveApp_Click"/>
                             </StackPanel>
                         </Border>
@@ -333,12 +335,12 @@
                         <Border Grid.Column="2" Background="White" CornerRadius="8" BorderBrush="#E2E8F0" BorderThickness="1" Padding="15">
                             <StackPanel>
                                 <TextBlock Text="Running Apps (Auto-Detect)" FontWeight="Bold" FontSize="15" Foreground="#555" Margin="0,0,0,10"/>
-                                <ListBox x:Name="ListRunningApps" Height="265" BorderBrush="#CBD5E1" FontSize="14" Foreground="#555"/>
+                                <ListBox x:Name="ListRunningApps" Height="170" BorderBrush="#CBD5E1" FontSize="14" Foreground="#555"/>
+                                <Button Content="Refresh List" Style="{StaticResource TealBtn}" Padding="10" Margin="0,10,0,0" Click="BtnRefresh_Click"/>
                             </StackPanel>
                         </Border>
                     </Grid>
                 </StackPanel>
-
             </Grid>
         </Grid>
     </Border>
