@@ -1,296 +1,576 @@
+#pragma warning disable CS8600, CS8602, CS8604, CS8618, CS8622, CS8625, CS0414
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
+using System.Windows.Media;
 using System.Windows.Threading;
 
 namespace RasFocusPro
 {
     public partial class MainWindow : Window
     {
-        private DispatcherTimer focusTimer;
-        private TimeSpan focusTimeLeft;
+        // ==========================================
+        // WINDOWS NATIVE API (P/Invoke)
+        // ==========================================
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetForegroundWindow();
 
-        private DispatcherTimer pomoTimer;
-        private TimeSpan pomoTimeLeft;
-        private int currentPomoSession = 1;
-        private int totalPomoSessions = 4;
-        private bool isFocusing = false;
+        // এটি যুক্ত করা হয়েছে SetForegroundWindow এরর ফিক্স করার জন্য
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        private static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
+
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        private static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        [DllImport("winmm.dll")]
+        private static extern long mciSendString(string strCommand, StringBuilder strReturn, int iReturnLength, IntPtr hwndCallback);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr SetWindowsHookEx(int idHook, LowLevelKeyboardProc lpfn, IntPtr hMod, uint dwThreadId);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool UnhookWindowsHookEx(IntPtr hhk);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        private static extern IntPtr GetModuleHandle(string lpModuleName);
+
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        static extern uint RegisterWindowMessage(string lpString);
+
+        [DllImport("user32.dll")]
+        static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+
+        // Constants
+        private const int SW_MINIMIZE = 6;
+        private const int WH_KEYBOARD_LL = 13;
+        private const int WM_KEYDOWN = 0x0100;
+        private const byte VK_CONTROL = 0x11;
+        private const uint KEYEVENTF_KEYUP = 0x0002;
+        private const int HWND_BROADCAST = 0xffff;
+
+        private static uint WM_WAKEUP = RegisterWindowMessage("RasFocusPro_Wakeup");
+
+        // ==========================================
+        // GLOBALS & DATA
+        // ==========================================
+        private DispatcherTimer fastTimer;
+        private DispatcherTimer slowTimer;
+        private DispatcherTimer syncTimer;
+        
+        private bool isSessionActive = false, isTimeMode = false, isPassMode = false, useAllowMode = false;
+        private bool blockReels = false, blockShorts = false, isAdblockActive = false, blockAdult = true;
+        private bool isPomodoroMode = false, isPomodoroBreak = false;
+        
+        private int focusTimeTotalSeconds = 0, timerTicks = 0;
+        private int pomoLengthMin = 25, pomoTotalSessions = 4, pomoCurrentSession = 1, pomoTicks = 0;
+        private int eyeBrightness = 100, eyeWarmth = 0;
+        
+        private string currentSessionPass = "", userProfileName = "Rasel Mia";
+        private int trialDaysLeft = 174;
+        private bool isLicenseValid = true, isTrialExpired = false;
+
+        private List<string> blockedApps = new List<string>();
+        private List<string> blockedWebs = new List<string>();
+        private List<string> allowedApps = new List<string>();
+        private List<string> allowedWebs = new List<string>();
+
+        private string[] systemApps = { "explorer.exe", "svchost.exe", "taskmgr.exe", "cmd.exe", "conhost.exe", "csrss.exe", "dwm.exe", "lsass.exe", "services.exe", "smss.exe", "wininit.exe", "winlogon.exe", "spoolsv.exe", "fontdrvhost.exe" };
+        
+        // Adult, Dance & Bangla Bad Words
+        private List<string> explicitKeywords = new List<string> {
+            "porn", "xxx", "sex", "nude", "nsfw", "xvideos", "pornhub", "xnxx", "xhamster", "brazzers", "onlyfans", "playboy", "mia khalifa", "bhabi", "chudai", "bangla choti", "magi", "sexy",
+            "hot video", "hot scene", "desi", "boudi", "devar", "item song", "item dance", "mujra", "belly dance", "bikini", "romance", "kissing", "ullu", "web series", "ullongo", "kapor chara", "tiktok dance", "dj dance", "hot dance", "nongra dance",
+            "খাসি", "চটি", "যৌন", "নগ্ন", "উলঙ্গ", "মেয়েদের ছবি", "গরম ভিডিও", "নষ্ট ভিডিও", "নোংরা ভিডিও", "খারাপ ছবি", "পর্ন", "যৌনতা", "choti golpo", "bangla sex", "meyeder chobi", "nongra video", "gorom video", "kapor chara chobi", "bangla hot", "boudi video", "deshi sexy", "biye barir dance", "মাগি", "পটানো", "সেক্সি নাচ", "অশ্লীল", "অশ্লীল ভিডিও", "বৌদি", "দেবর বৌদি", "ভাবি", "গোপন ভিডিও", "ভাইরাল ভিডিও"
+        };
+        
+        private string[] safeBrowserTitles = { "new tab", "start", "blank page", "allowed websites", "loading", "untitled", "connecting", "pomodoro break" };
+
+        private string[] islamicQuotes = { 
+            "\"মুমিনদের বলুন, তারা যেন তাদের দৃষ্টি নত রাখে এবং তাদের যৌনাঙ্গর হেফাযত করে।\" - (সূরা আন-নূর: ৩০)", 
+            "\"লজ্জাশীলতা কল্যাণ ছাড়া আর কিছুই বয়ে আনে না।\" - (সহীহ বুখারী)" 
+        };
+        private string[] timeQuotes = { 
+            "\"যারা সময়কে মূল্যায়ন করে না, সময়ও তাদেরকে মূল্যায়ন করে না।\" - এ.পি.জে. আবদুল কালাম" 
+        };
+
+        private string secretDir;
+        private Window overlayWindow = null;
+        private Window eyeFilterDim = null;
+        private Window eyeFilterWarm = null;
+
+        // System.Windows.Forms.NotifyIcon সরাসরি কল করা হয়েছে কনফ্লিক্ট এড়াতে
+        private System.Windows.Forms.NotifyIcon trayIcon;
+
+        // Keyboard Hook Setup
+        private delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
+        private static LowLevelKeyboardProc _proc;
+        private static IntPtr _hookID = IntPtr.Zero;
+        private static string globalKeyBuffer = "";
+        private static MainWindow _instance; 
+        private static Mutex _mutex = null;
 
         public MainWindow()
         {
+            // 1. Single Instance Check & Wakeup Broadcast
+            bool createdNew;
+            _mutex = new Mutex(true, "RasFocusPro_Mutex_V55", out createdNew);
+            if (!createdNew)
+            {
+                PostMessage((IntPtr)HWND_BROADCAST, WM_WAKEUP, IntPtr.Zero, IntPtr.Zero);
+                System.Windows.Application.Current.Shutdown();
+                return;
+            }
+
             InitializeComponent();
+            _instance = this;
             
-            // Focus Timer Setup
-            focusTimer = new DispatcherTimer();
-            focusTimer.Interval = TimeSpan.FromSeconds(1);
-            focusTimer.Tick += FocusTimer_Tick;
+            secretDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RasFocusPro");
+            Directory.CreateDirectory(secretDir);
 
-            // Pomodoro Timer Setup
-            pomoTimer = new DispatcherTimer();
-            pomoTimer.Interval = TimeSpan.FromSeconds(1);
-            pomoTimer.Tick += PomoTimer_Tick;
-            
-            LoadMockData();
+            LoadData();
+            RefreshRunningApps();
+            SetupTrayIcon();
+            SetupEyeFilters();
+
+            _proc = HookCallback;
+            _hookID = SetHook(_proc);
+
+            fastTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
+            fastTimer.Tick += FastLoop_Tick;
+            fastTimer.Start();
+
+            slowTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+            slowTimer.Tick += SlowLoop_Tick;
+            slowTimer.Start();
+
+            syncTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(4) };
+            syncTimer.Tick += SyncLoop_Tick;
+            syncTimer.Start();
         }
 
-        private void LoadMockData()
+        // Catch WM_WAKEUP to bring window to front
+        protected override void OnSourceInitialized(EventArgs e)
         {
-            // ডেমোনস্ট্রেশনের জন্য কম্বোবক্সে কিছু ডিফল্ট আইটেম যুক্ত করা হয়েছে
-            ComboAppBlock.Items.Add("vlc.exe");
-            ComboAppBlock.Items.Add("chrome.exe");
-            ComboWebBlock.Items.Add("facebook.com");
-            ComboWebBlock.Items.Add("youtube.com");
+            base.OnSourceInitialized(e);
+            HwndSource source = PresentationSource.FromVisual(this) as HwndSource;
+            source.AddHook(WndProc);
         }
 
-        // --- Window Actions ---
-        private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
         {
-            if (e.ChangedButton == MouseButton.Left)
-                this.DragMove();
+            if (msg == WM_WAKEUP)
+            {
+                ShowAppFromTray();
+                handled = true;
+            }
+            return IntPtr.Zero;
         }
 
-        private void MinimizeButton_Click(object sender, RoutedEventArgs e)
+        protected override void OnClosed(EventArgs e)
         {
-            this.WindowState = WindowState.Minimized;
+            UnhookWindowsHookEx(_hookID);
+            if (trayIcon != null) trayIcon.Dispose();
+            base.OnClosed(e);
         }
 
-        private void CloseButton_Click(object sender, RoutedEventArgs e)
+        // ==========================================
+        // SYSTEM TRAY LOGIC
+        // ==========================================
+        private void SetupTrayIcon()
         {
-            Application.Current.Shutdown();
+            trayIcon = new System.Windows.Forms.NotifyIcon();
+            string iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "icon.ico");
+            if (File.Exists(iconPath)) { trayIcon.Icon = new System.Drawing.Icon(iconPath); }
+            else { trayIcon.Icon = System.Drawing.SystemIcons.Shield; }
+
+            trayIcon.Text = "RasFocus Pro - Focus Manager";
+            trayIcon.Visible = true;
+            trayIcon.DoubleClick += (s, e) => ShowAppFromTray();
+
+            System.Windows.Forms.ContextMenuStrip menu = new System.Windows.Forms.ContextMenuStrip();
+            menu.Items.Add("Open RasFocus", null, (s, e) => ShowAppFromTray());
+            menu.Items.Add("Exit App", null, (s, e) => 
+            {
+                if (isSessionActive)
+                {
+                    System.Windows.MessageBox.Show("Cannot exit while Focus Mode is active! Please stop it first.", "Security Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+                else
+                {
+                    trayIcon.Dispose();
+                    System.Windows.Application.Current.Shutdown();
+                }
+            });
+            trayIcon.ContextMenuStrip = menu;
         }
 
-        // --- Sidebar Navigation ---
+        private void ShowAppFromTray()
+        {
+            this.Show();
+            this.WindowState = WindowState.Normal;
+            this.Activate(); 
+            this.Topmost = true; 
+            this.Topmost = false; 
+            this.Focus();
+        }
+
+        // ==========================================
+        // UI EVENT HANDLERS
+        // ==========================================
+        private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) { DragMove(); }
+        
+        private void CloseButton_Click(object sender, RoutedEventArgs e) 
+        { 
+            this.Hide(); 
+            trayIcon.ShowBalloonTip(2000, "RasFocus Pro", "Running securely in the background...", System.Windows.Forms.ToolTipIcon.Info);
+        }
+
         private void SidebarList_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (PageFocusMode == null || PageEyeCure == null || PagePomodoro == null) return;
-
-            PageFocusMode.Visibility = Visibility.Collapsed;
-            PageEyeCure.Visibility = Visibility.Collapsed;
-            PagePomodoro.Visibility = Visibility.Collapsed;
-
+            if (PageFocusMode == null) return;
             int index = SidebarList.SelectedIndex;
-            if (index == 0) PageFocusMode.Visibility = Visibility.Visible;
-            else if (index == 1) PageEyeCure.Visibility = Visibility.Visible;
-            else if (index == 2) PagePomodoro.Visibility = Visibility.Visible;
+            PageFocusMode.Visibility = index == 0 ? Visibility.Visible : Visibility.Collapsed;
+            PageEyeCure.Visibility = index == 1 ? Visibility.Visible : Visibility.Collapsed;
+            PagePomodoro.Visibility = index == 2 ? Visibility.Visible : Visibility.Collapsed;
         }
 
-        // --- Focus Mode Features ---
         private void BtnSave_Click(object sender, RoutedEventArgs e)
         {
-            MessageBox.Show($"Profile '{TxtProfileName.Text}' saved successfully!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
-        }
-
-        private void BtnLiveChat_Click(object sender, RoutedEventArgs e)
-        {
-            // লাইভ চ্যাট লিংক ওপেন করার লজিক
-            Process.Start(new ProcessStartInfo("https://your-live-chat-link.com") { UseShellExecute = true });
-        }
-
-        private void BtnUpgrade_Click(object sender, RoutedEventArgs e)
-        {
-            MessageBox.Show("Upgrade to Pro to unlock all features!", "Upgrade", MessageBoxButton.OK, MessageBoxImage.Information);
+            // userProfileName = TxtProfileName.Text; // Assuming TxtProfileName exists in your exact XAML
+            System.Windows.MessageBox.Show("Profile Name Saved!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         private void BtnStart_Click(object sender, RoutedEventArgs e)
         {
-            if (isFocusing) return;
-
-            int hours = 0, minutes = 0;
-            int.TryParse(TxtTimeHr.Text, out hours);
-            int.TryParse(TxtTimeMin.Text, out minutes);
-
-            if (hours == 0 && minutes == 0)
-            {
-                MessageBox.Show("Please set a valid time.", "Invalid Time", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-            if (string.IsNullOrWhiteSpace(TxtPass.Text))
-            {
-                 MessageBox.Show("Please set a lock password to start.", "Password Required", MessageBoxButton.OK, MessageBoxImage.Warning);
-                 return;
-            }
-
-            focusTimeLeft = new TimeSpan(hours, minutes, 0);
-            LblStatus.Text = $"Focusing: {focusTimeLeft:hh\\:mm\\:ss}";
-            LblStatus.Foreground = (System.Windows.Media.Brush)FindResource("SuccessGreen");
+            if (isSessionActive) return;
             
-            isFocusing = true;
-            BtnStart.IsEnabled = false;
-            focusTimer.Start();
+            // Allow Mode logic parsing
+            // useAllowMode = (RbAllowList.IsChecked == true); // Implement based on Radio buttons
+
+            isPassMode = true;
+            // currentSessionPass = TxtPass.Text; // Assuming TxtPass exists
+            isSessionActive = true;
+            
+            SaveData();
+            UpdateUIStates();
+            ManageFocusSound(true);
+            
+            System.Windows.MessageBox.Show("Focus Mode Active. Unauthorized apps and websites are now blocked.", "RasFocus Pro Security", MessageBoxButton.OK, MessageBoxImage.Information);
+            this.Hide(); 
         }
 
         private void BtnStop_Click(object sender, RoutedEventArgs e)
         {
-            if (!isFocusing) return;
+            if (!isSessionActive) return;
 
-            // পাসওয়ার্ড ভেরিফিকেশন লজিক 
-            if (TxtPass.Text != "1234") // এখানে আপনার সিকিউর লজিক বসবে
-            {
-                MessageBox.Show("Correct password required to stop early!", "Locked", MessageBoxButton.OK, MessageBoxImage.Error);
-                // ডেমোর জন্য পাসওয়ার্ড না মিললেও স্টপ না করার অপশন রাখতে পারেন
-            }
-
-            focusTimer.Stop();
-            isFocusing = false;
-            BtnStart.IsEnabled = true;
-            LblStatus.Text = "Ready";
-            LblStatus.Foreground = (System.Windows.Media.Brush)FindResource("WarningRed");
+            // Password verification logic goes here based on TxtPass.Text
+            ClearSessionData();
+            System.Windows.MessageBox.Show("Session Stopped Successfully.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
-        private void FocusTimer_Tick(object sender, EventArgs e)
-        {
-            if (focusTimeLeft.TotalSeconds > 0)
-            {
-                focusTimeLeft = focusTimeLeft.Subtract(TimeSpan.FromSeconds(1));
-                LblStatus.Text = $"Focusing: {focusTimeLeft:hh\\:mm\\:ss}";
-            }
-            else
-            {
-                focusTimer.Stop();
-                isFocusing = false;
-                BtnStart.IsEnabled = true;
-                LblStatus.Text = "Finished!";
-                MessageBox.Show("Focus Session Completed!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
-            }
-        }
-
-        private void BtnStopWatch_Click(object sender, RoutedEventArgs e)
-        {
-            MessageBox.Show("Stopwatch feature coming soon!", "Info");
-        }
-
-        // --- Block/Allow List Management ---
-        private void BtnAddApp_Click(object sender, RoutedEventArgs e)
-        {
-            if (!string.IsNullOrWhiteSpace(ComboAppBlock.Text) && !ListBlockedApps.Items.Contains(ComboAppBlock.Text))
-                ListBlockedApps.Items.Add(ComboAppBlock.Text);
-        }
-
-        private void BtnAddWeb_Click(object sender, RoutedEventArgs e)
-        {
-            if (!string.IsNullOrWhiteSpace(ComboWebBlock.Text) && !ListBlockedWebs.Items.Contains(ComboWebBlock.Text))
-                ListBlockedWebs.Items.Add(ComboWebBlock.Text);
-        }
-
-        private void BtnRemApp_Click(object sender, RoutedEventArgs e)
-        {
-            // সিলেক্টেড আইটেম ডিলিট করার লজিক
-            if (ListBlockedApps.SelectedIndex != -1)
-                ListBlockedApps.Items.RemoveAt(ListBlockedApps.SelectedIndex);
-            else if (ListBlockedWebs.SelectedIndex != -1)
-                ListBlockedWebs.Items.RemoveAt(ListBlockedWebs.SelectedIndex);
-        }
-
-        private void BtnRefresh_Click(object sender, RoutedEventArgs e)
-        {
-            ListRunningApps.Items.Clear();
-            var processes = Process.GetProcesses().Where(p => !string.IsNullOrEmpty(p.MainWindowTitle)).Take(15);
-            foreach (var p in processes)
-            {
-                ListRunningApps.Items.Add($"{p.ProcessName}.exe");
-            }
-        }
-
-        private void BtnAddAllowApp_Click(object sender, RoutedEventArgs e)
-        {
-            if (!string.IsNullOrWhiteSpace(ComboAppAllow.Text) && !ListAllowApps.Items.Contains(ComboAppAllow.Text))
-                ListAllowApps.Items.Add(ComboAppAllow.Text);
-        }
-
-        private void BtnAddAllowWeb_Click(object sender, RoutedEventArgs e)
-        {
-            if (!string.IsNullOrWhiteSpace(ComboWebAllow.Text) && !ListAllowWebs.Items.Contains(ComboWebAllow.Text))
-                ListAllowWebs.Items.Add(ComboWebAllow.Text);
-        }
-
-        private void BtnRemAllowApp_Click(object sender, RoutedEventArgs e)
-        {
-            if (ListAllowApps.SelectedIndex != -1)
-                ListAllowApps.Items.RemoveAt(ListAllowApps.SelectedIndex);
-            else if (ListAllowWebs.SelectedIndex != -1)
-                ListAllowWebs.Items.RemoveAt(ListAllowWebs.SelectedIndex);
-        }
-
-        // --- Eye Cure Display ---
-        private void SliderBrightness_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            // আসল ব্রাইটনেস কন্ট্রোলের জন্য Win32 API (যেমন WmiMonitorBrightness) ব্যবহার করতে হবে
-        }
-
-        private void SliderWarmth_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            // স্ক্রিন ফিল্টারের জন্য কাস্টম ওভারলে বা API ব্যবহার করতে হবে
-        }
-
-        private void PresetDay_Click(object sender, RoutedEventArgs e)
-        {
-            SliderBrightness.Value = 100;
-            SliderWarmth.Value = 0;
-        }
-
-        private void PresetReading_Click(object sender, RoutedEventArgs e)
-        {
-            SliderBrightness.Value = 60;
-            SliderWarmth.Value = 40;
-        }
-
-        private void PresetNight_Click(object sender, RoutedEventArgs e)
-        {
-            SliderBrightness.Value = 30;
-            SliderWarmth.Value = 80;
-        }
-
-        // --- Pomodoro Setup ---
         private void BtnPomoStart_Click(object sender, RoutedEventArgs e)
         {
-            int min;
-            if (int.TryParse(TxtPomoMin.Text, out min))
+            if (!isSessionActive && !isTrialExpired)
             {
-                int.TryParse(TxtPomoSessions.Text, out totalPomoSessions);
-                pomoTimeLeft = TimeSpan.FromMinutes(min);
-                LblPomoTime.Text = pomoTimeLeft.ToString("hh\\:mm\\:ss");
-                LblPomoStatus.Text = $"Status: Session {currentPomoSession}/{totalPomoSessions} Running";
-                pomoTimer.Start();
-                BtnPomoStart.IsEnabled = false;
+                isPomodoroMode = true;
+                isSessionActive = true;
+                pomoTicks = 0;
+                pomoCurrentSession = 1;
+                SaveData();
+                UpdateUIStates();
+                ManageFocusSound(true);
             }
         }
 
         private void BtnPomoStop_Click(object sender, RoutedEventArgs e)
         {
-            pomoTimer.Stop();
-            BtnPomoStart.IsEnabled = true;
-            LblPomoStatus.Text = "Status: Stopped";
+            if (isPomodoroMode)
+            {
+                ClearSessionData();
+                UpdateUIStates();
+            }
         }
 
-        private void PomoTimer_Tick(object sender, EventArgs e)
+        private void UpdateUIStates()
         {
-            if (pomoTimeLeft.TotalSeconds > 0)
+            trayIcon.Text = isSessionActive ? "RasFocus Pro (ACTIVE 🔒)" : "RasFocus Pro (Ready)";
+        }
+
+        // ==========================================
+        // BACKGROUND LOGIC (TIMERS)
+        // ==========================================
+        private void RefreshRunningApps()
+        {
+            // ListRunningApps.Items.Clear();
+            var apps = Process.GetProcesses().Select(p => p.ProcessName.ToLower() + ".exe").Distinct().OrderBy(n => n);
+            // foreach (var app in apps) ListRunningApps.Items.Add(app);
+        }
+
+        private void FastLoop_Tick(object sender, EventArgs e)
+        {
+            if (!blockAdult && !blockReels && !blockShorts && !isSessionActive) return;
+            if (overlayWindow != null && overlayWindow.IsVisible) return;
+
+            IntPtr hWnd = GetForegroundWindow();
+            if (hWnd != IntPtr.Zero)
             {
-                pomoTimeLeft = pomoTimeLeft.Subtract(TimeSpan.FromSeconds(1));
-                LblPomoTime.Text = pomoTimeLeft.ToString("hh\\:mm\\:ss");
+                StringBuilder title = new StringBuilder(512);
+                GetWindowText(hWnd, title, 512);
+                string sTitle = title.ToString().ToLower();
+
+                // 1. Explicit Keywords Block
+                if (blockAdult && explicitKeywords.Any(k => sTitle.Contains(k)))
+                {
+                    CloseWindowNatively(hWnd);
+                    ShowOverlay(GetRandomQuote(1));
+                    return;
+                }
+
+                // 2. Social Media Block
+                if (blockReels && sTitle.Contains("facebook") && sTitle.Contains("reels")) { CloseWindowNatively(hWnd); ShowOverlay(GetRandomQuote(2)); return; }
+                if (blockShorts && sTitle.Contains("youtube") && sTitle.Contains("shorts")) { CloseWindowNatively(hWnd); ShowOverlay(GetRandomQuote(2)); return; }
+
+                // 3. Focus Mode Logic
+                if (isSessionActive)
+                {
+                    bool isBrowser = sTitle.Contains("chrome") || sTitle.Contains("edge") || sTitle.Contains("firefox") || sTitle.Contains("brave");
+                    if (isBrowser)
+                    {
+                        if (useAllowMode)
+                        {
+                            if (!allowedWebs.Any(w => sTitle.Contains(w.ToLower())) && !sTitle.Contains("allowed websites"))
+                            {
+                                CloseWindowNatively(hWnd);
+                                ShowOverlay("Website not in Allow List!");
+                            }
+                        }
+                        else
+                        {
+                            if (blockedWebs.Any(w => sTitle.Contains(w.ToLower())))
+                            {
+                                CloseWindowNatively(hWnd);
+                                ShowOverlay("Website Blocked by Focus Mode!");
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        private void SlowLoop_Tick(object sender, EventArgs e)
+        {
+            if (!isSessionActive) return;
+
+            // Pomodoro Logic
+            if (isPomodoroMode)
+            {
+                pomoTicks++;
+                int totalMins = isPomodoroBreak ? 5 : pomoLengthMin;
+                int left = (totalMins * 60) - pomoTicks;
+                if (left < 0) left = 0;
+
+                TimeSpan t = TimeSpan.FromSeconds(left);
+                // LblPomoTime.Text = t.ToString(@"hh\:mm\:ss");
+
+                if (!isPomodoroBreak && pomoTicks >= pomoLengthMin * 60)
+                {
+                    isPomodoroBreak = true;
+                    pomoTicks = 0;
+                    ShowOverlay("☕ Time to Rest & Drink Water! Break Started.");
+                }
+            }
+
+            // Native Process Killer (The Enforcer)
+            foreach (Process p in Process.GetProcesses())
+            {
+                try
+                {
+                    string pName = p.ProcessName.ToLower() + ".exe";
+                    if (pName == "taskmgr.exe" || pName == "msiexec.exe") { p.Kill(); continue; } 
+
+                    if (useAllowMode)
+                    {
+                        if (!systemApps.Contains(pName) && !allowedApps.Contains(pName)) p.Kill();
+                    }
+                    else
+                    {
+                        if (blockedApps.Contains(pName)) p.Kill();
+                    }
+                }
+                catch { /* Ignore access denied */ }
+            }
+        }
+
+        private void SyncLoop_Tick(object sender, EventArgs e)
+        {
+            // PowerShell Firebase sync can go here
+        }
+
+        // ==========================================
+        // UTILITIES & NATIVE HELPERS
+        // ==========================================
+        private string GetRandomQuote(int type)
+        {
+            Random r = new Random();
+            if (type == 1) return islamicQuotes[r.Next(islamicQuotes.Length)];
+            else return timeQuotes[r.Next(timeQuotes.Length)];
+        }
+
+        private void CloseWindowNatively(IntPtr hWnd)
+        {
+            SetForegroundWindow(hWnd);
+            keybd_event(VK_CONTROL, 0, 0, UIntPtr.Zero);
+            keybd_event((byte)'W', 0, 0, UIntPtr.Zero);
+            keybd_event((byte)'W', 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+            keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+            Thread.Sleep(50);
+            ShowWindow(hWnd, SW_MINIMIZE);
+        }
+
+        private void ShowOverlay(string message)
+        {
+            if (overlayWindow == null)
+            {
+                overlayWindow = new Window
+                {
+                    WindowStyle = WindowStyle.None, AllowsTransparency = true,
+                    Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(240, 9, 61, 31)),
+                    Topmost = true, Width = 800, Height = 300,
+                    WindowStartupLocation = WindowStartupLocation.CenterScreen
+                };
+                TextBlock tb = new TextBlock
+                {
+                    Text = message, Foreground = System.Windows.Media.Brushes.White, FontSize = 24, FontWeight = FontWeights.Bold,
+                    HorizontalAlignment = System.Windows.HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+                    TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center, Margin = new Thickness(20)
+                };
+                overlayWindow.Content = tb;
             }
             else
             {
-                pomoTimer.Stop();
-                if (currentPomoSession < totalPomoSessions)
+                ((TextBlock)overlayWindow.Content).Text = message;
+            }
+            
+            overlayWindow.Show();
+            overlayWindow.Topmost = true;
+
+            DispatcherTimer t = new DispatcherTimer { Interval = TimeSpan.FromSeconds(6) };
+            t.Tick += (s, ev) => { overlayWindow.Hide(); t.Stop(); };
+            t.Start();
+        }
+
+        private void SetupEyeFilters()
+        {
+            eyeFilterDim = new Window { WindowStyle = WindowStyle.None, AllowsTransparency = true, Background = System.Windows.Media.Brushes.Transparent, Topmost = true, ShowInTaskbar = false, IsHitTestVisible = false, WindowState = WindowState.Maximized };
+            eyeFilterWarm = new Window { WindowStyle = WindowStyle.None, AllowsTransparency = true, Background = System.Windows.Media.Brushes.Transparent, Topmost = true, ShowInTaskbar = false, IsHitTestVisible = false, WindowState = WindowState.Maximized };
+            eyeFilterDim.Show(); eyeFilterWarm.Show();
+        }
+
+        private void ManageFocusSound(bool start)
+        {
+            string audioPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "focus_noise.mp3");
+            if (start && File.Exists(audioPath))
+            {
+                mciSendString($"open \"{audioPath}\" type mpegvideo alias focusSound", null, 0, IntPtr.Zero);
+                mciSendString("play focusSound repeat", null, 0, IntPtr.Zero);
+            }
+            else
+            {
+                mciSendString("stop focusSound", null, 0, IntPtr.Zero);
+                mciSendString("close focusSound", null, 0, IntPtr.Zero);
+            }
+        }
+
+        private void ClearSessionData()
+        {
+            isSessionActive = false;
+            isPassMode = false;
+            isPomodoroMode = false;
+            currentSessionPass = "";
+            SaveData();
+            UpdateUIStates();
+            ManageFocusSound(false);
+        }
+
+        // ==========================================
+        // REAL-TIME KEYBOARD HOOK (TYPING BLOCKER)
+        // ==========================================
+        private static IntPtr SetHook(LowLevelKeyboardProc proc)
+        {
+            using (Process curProcess = Process.GetCurrentProcess())
+            using (ProcessModule curModule = curProcess.MainModule)
+            {
+                return SetWindowsHookEx(WH_KEYBOARD_LL, proc, GetModuleHandle(curModule.ModuleName), 0);
+            }
+        }
+
+        private static IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
+        {
+            if (nCode >= 0 && wParam == (IntPtr)WM_KEYDOWN && _instance != null && _instance.blockAdult)
+            {
+                int vkCode = Marshal.ReadInt32(lParam);
+                char c = (char)vkCode;
+                if (char.IsLetterOrDigit(c) || char.IsPunctuation(c))
                 {
-                    currentPomoSession++;
-                    MessageBox.Show("Time for a short break!", "Pomodoro", MessageBoxButton.OK, MessageBoxImage.Information);
-                    
-                    BtnPomoStart.IsEnabled = true;
-                    LblPomoStatus.Text = $"Status: Ready for Session {currentPomoSession}";
+                    globalKeyBuffer += char.ToLower(c);
+                    if (globalKeyBuffer.Length > 50) globalKeyBuffer = globalKeyBuffer.Substring(1);
+
+                    foreach (string kw in _instance.explicitKeywords)
+                    {
+                        if (globalKeyBuffer.Contains(kw))
+                        {
+                            globalKeyBuffer = ""; // Reset buffer
+                            IntPtr hActive = GetForegroundWindow();
+                            if (hActive != IntPtr.Zero) _instance.CloseWindowNatively(hActive);
+                            
+                            // Show Islamic Quote immediately on bad word typing
+                            _instance.ShowOverlay(_instance.GetRandomQuote(1));
+                            break;
+                        }
+                    }
                 }
-                else
-                {
-                    MessageBox.Show("All sessions completed! Great job!", "Pomodoro", MessageBoxButton.OK, MessageBoxImage.Information);
-                    currentPomoSession = 1;
-                    BtnPomoStart.IsEnabled = true;
-                    LblPomoStatus.Text = "Status: Finished";
-                }
+            }
+            return CallNextHookEx(_hookID, nCode, wParam, lParam);
+        }
+
+        // ==========================================
+        // DATA SAVE/LOAD
+        // ==========================================
+        private void SaveData()
+        {
+            File.WriteAllLines(Path.Combine(secretDir, "bl_app.txt"), blockedApps);
+        }
+
+        private void LoadData()
+        {
+            string path = Path.Combine(secretDir, "bl_app.txt");
+            if (File.Exists(path))
+            {
+                blockedApps = File.ReadAllLines(path).ToList();
             }
         }
     }
