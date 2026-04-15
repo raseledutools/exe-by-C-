@@ -7,7 +7,8 @@
         TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType">
 
     <Window.Resources>
-        <SolidColorBrush x:Key="PrimaryTeal" Color="#0EA5E9"/> <SolidColorBrush x:Key="DarkText" Color="#1E293B"/>
+        <SolidColorBrush x:Key="PrimaryTeal" Color="#0EA5E9"/> 
+        <SolidColorBrush x:Key="DarkText" Color="#1E293B"/>
         <SolidColorBrush x:Key="LightBg" Color="#FFFFFF"/>
         <SolidColorBrush x:Key="CardBg" Color="#F8FAFC"/>
 
@@ -85,7 +86,8 @@
                         </StackPanel>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="BgBorder" Property="Background" Value="#10B981"/> <Setter TargetName="Thumb" Property="HorizontalAlignment" Value="Right"/>
+                                <Setter TargetName="BgBorder" Property="Background" Value="#10B981"/> 
+                                <Setter TargetName="Thumb" Property="HorizontalAlignment" Value="Right"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -171,7 +173,7 @@
                         <StackPanel Grid.Column="0" Orientation="Horizontal">
                             <TextBlock Text="Profile Name:" VerticalAlignment="Center" FontSize="13" FontWeight="SemiBold" Foreground="#475569" Margin="0,0,8,0"/>
                             <TextBox x:Name="TxtProfileName" Width="130" Margin="0,0,10,0" Text="Rasel Mia"/>
-                            <Button x:Name="BtnSaveProfile" Content="SAVE" Style="{StaticResource CareBtn}" Background="#10B981" Padding="15,4" FontSize="12"/>
+                            <Button x:Name="BtnSaveProfile" Content="SAVE" Style="{StaticResource CareBtn}" Background="#10B981" Padding="15,4" FontSize="12" Click="BtnSave_Click"/>
                         </StackPanel>
 
                         <TextBlock x:Name="LblTrialStatus" Grid.Column="1" Text="TRIAL: 7 DAYS LEFT" Foreground="#F59E0B" FontWeight="Bold" FontSize="14" VerticalAlignment="Center" HorizontalAlignment="Center"/>
@@ -195,8 +197,8 @@
                                 <TextBox x:Name="TxtTimeHr" Width="40" Margin="0,0,5,0" Text="0"/>
                                 <TextBox x:Name="TxtTimeMin" Width="40" Margin="0,0,15,0" Text="0"/>
 
-                                <Button x:Name="BtnStartFocus" Content="START" Style="{StaticResource CareBtn}" Background="#10B981" Margin="0,0,8,0"/>
-                                <Button x:Name="BtnStopFocus" Content="STOP" Style="{StaticResource CareBtn}" Background="#EF4444" Margin="0,0,8,0"/>
+                                <Button x:Name="BtnStartFocus" Content="START" Style="{StaticResource CareBtn}" Background="#10B981" Margin="0,0,8,0" Click="BtnStart_Click"/>
+                                <Button x:Name="BtnStopFocus" Content="STOP" Style="{StaticResource CareBtn}" Background="#EF4444" Margin="0,0,8,0" Click="BtnStop_Click"/>
                                 <Button x:Name="BtnStopwatch" Content="STOP WATCH" Style="{StaticResource CareBtn}" Background="#1E293B" Margin="0,0,8,0"/>
                                 <Button x:Name="BtnPomodoro" Content="POMODORO" Style="{StaticResource CareBtn}" Background="#F43F5E" Margin="0,0,8,0"/>
                                 <Button x:Name="BtnEyeCure" Content="EYE CURE" Style="{StaticResource CareBtn}" Background="#8B5CF6" Margin="0,0,15,0"/>
@@ -244,7 +246,7 @@
                                         </Grid.ColumnDefinitions>
                                         <TextBox x:Name="TxtAppBlock" Grid.Column="0" Margin="0,0,5,0"/>
                                         <ComboBox x:Name="ComboAppBlock" Grid.Column="1" Margin="0,0,5,0"/>
-                                        <Button x:Name="BtnAddAppBlock" Grid.Column="2" Content="ADD" Style="{StaticResource CareBtn}" Background="#3B82F6" Padding="5,2" FontSize="11"/>
+                                        <Button x:Name="BtnAddAppBlock" Grid.Column="2" Content="ADD" Style="{StaticResource CareBtn}" Background="#3B82F6" Padding="5,2" FontSize="11" Click="BtnAddAppBlock_Click"/>
                                     </Grid>
                                 </StackPanel>
                                 <Grid Grid.Row="1" Margin="0,0,0,10">
@@ -253,7 +255,7 @@
                                         <RowDefinition Height="Auto"/>
                                     </Grid.RowDefinitions>
                                     <ListBox x:Name="ListAppBlock" Grid.Row="0" BorderBrush="#CBD5E1" Margin="0,0,0,5"/>
-                                    <Button x:Name="BtnRemAppBlock" Grid.Row="1" Content="Remove" Style="{StaticResource CareBtn}" Background="#64748B" Padding="5,2" FontSize="11"/>
+                                    <Button x:Name="BtnRemAppBlock" Grid.Row="1" Content="Remove" Style="{StaticResource CareBtn}" Background="#64748B" Padding="5,2" FontSize="11" Click="BtnRemAppBlock_Click"/>
                                 </Grid>
 
                                 <StackPanel Grid.Row="2">
@@ -266,7 +268,7 @@
                                         </Grid.ColumnDefinitions>
                                         <TextBox x:Name="TxtWebBlock" Grid.Column="0" Margin="0,0,5,0"/>
                                         <ComboBox x:Name="ComboWebBlock" Grid.Column="1" Margin="0,0,5,0"/>
-                                        <Button x:Name="BtnAddWebBlock" Grid.Column="2" Content="ADD" Style="{StaticResource CareBtn}" Background="#3B82F6" Padding="5,2" FontSize="11"/>
+                                        <Button x:Name="BtnAddWebBlock" Grid.Column="2" Content="ADD" Style="{StaticResource CareBtn}" Background="#3B82F6" Padding="5,2" FontSize="11" Click="BtnAddWebBlock_Click"/>
                                     </Grid>
                                 </StackPanel>
                                 <Grid Grid.Row="3">
@@ -275,7 +277,7 @@
                                         <RowDefinition Height="Auto"/>
                                     </Grid.RowDefinitions>
                                     <ListBox x:Name="ListWebBlock" Grid.Row="0" BorderBrush="#CBD5E1" Margin="0,0,0,5"/>
-                                    <Button x:Name="BtnRemWebBlock" Grid.Row="1" Content="Remove" Style="{StaticResource CareBtn}" Background="#64748B" Padding="5,2" FontSize="11"/>
+                                    <Button x:Name="BtnRemWebBlock" Grid.Row="1" Content="Remove" Style="{StaticResource CareBtn}" Background="#64748B" Padding="5,2" FontSize="11" Click="BtnRemWebBlock_Click"/>
                                 </Grid>
                             </Grid>
                         </Border>
@@ -289,7 +291,7 @@
                                     <RowDefinition Height="*"/>
                                 </Grid.RowDefinitions>
                                 <TextBlock Grid.Row="0" Text="Running Apps (Auto-Detect)" FontSize="12" FontWeight="SemiBold" Foreground="#64748B" Margin="0,0,0,5"/>
-                                <Button x:Name="BtnAddFromRunning" Grid.Row="1" Content="Add Selected App to List" Style="{StaticResource CareBtn}" Background="#8B5CF6" Padding="5,6" Margin="0,0,0,8"/>
+                                <Button x:Name="BtnAddFromRunning" Grid.Row="1" Content="Add Selected App to List" Style="{StaticResource CareBtn}" Background="#8B5CF6" Padding="5,6" Margin="0,0,0,8" Click="BtnAddFromRunning_Click"/>
                                 <ListBox Grid.Row="2" x:Name="ListRunningApps" BorderBrush="#CBD5E1"/>
                             </Grid>
                         </Border>
@@ -314,7 +316,7 @@
                                         </Grid.ColumnDefinitions>
                                         <TextBox x:Name="TxtAppAllow" Grid.Column="0" Margin="0,0,5,0"/>
                                         <ComboBox x:Name="ComboAppAllow" Grid.Column="1" Margin="0,0,5,0"/>
-                                        <Button x:Name="BtnAddAppAllow" Grid.Column="2" Content="ADD" Style="{StaticResource CareBtn}" Background="#10B981" Padding="5,2" FontSize="11"/>
+                                        <Button x:Name="BtnAddAppAllow" Grid.Column="2" Content="ADD" Style="{StaticResource CareBtn}" Background="#10B981" Padding="5,2" FontSize="11" Click="BtnAddAppAllow_Click"/>
                                     </Grid>
                                 </StackPanel>
                                 <Grid Grid.Row="1" Margin="0,0,0,10">
@@ -323,7 +325,7 @@
                                         <RowDefinition Height="Auto"/>
                                     </Grid.RowDefinitions>
                                     <ListBox x:Name="ListAppAllow" Grid.Row="0" BorderBrush="#CBD5E1" Margin="0,0,0,5"/>
-                                    <Button x:Name="BtnRemAppAllow" Grid.Row="1" Content="Remove" Style="{StaticResource CareBtn}" Background="#64748B" Padding="5,2" FontSize="11"/>
+                                    <Button x:Name="BtnRemAppAllow" Grid.Row="1" Content="Remove" Style="{StaticResource CareBtn}" Background="#64748B" Padding="5,2" FontSize="11" Click="BtnRemAppAllow_Click"/>
                                 </Grid>
 
                                 <StackPanel Grid.Row="2">
@@ -336,7 +338,7 @@
                                         </Grid.ColumnDefinitions>
                                         <TextBox x:Name="TxtWebAllow" Grid.Column="0" Margin="0,0,5,0"/>
                                         <ComboBox x:Name="ComboWebAllow" Grid.Column="1" Margin="0,0,5,0"/>
-                                        <Button x:Name="BtnAddWebAllow" Grid.Column="2" Content="ADD" Style="{StaticResource CareBtn}" Background="#10B981" Padding="5,2" FontSize="11"/>
+                                        <Button x:Name="BtnAddWebAllow" Grid.Column="2" Content="ADD" Style="{StaticResource CareBtn}" Background="#10B981" Padding="5,2" FontSize="11" Click="BtnAddWebAllow_Click"/>
                                     </Grid>
                                 </StackPanel>
                                 <Grid Grid.Row="3">
@@ -345,7 +347,7 @@
                                         <RowDefinition Height="Auto"/>
                                     </Grid.RowDefinitions>
                                     <ListBox x:Name="ListWebAllow" Grid.Row="0" BorderBrush="#CBD5E1" Margin="0,0,0,5"/>
-                                    <Button x:Name="BtnRemWebAllow" Grid.Row="1" Content="Remove" Style="{StaticResource CareBtn}" Background="#64748B" Padding="5,2" FontSize="11"/>
+                                    <Button x:Name="BtnRemWebAllow" Grid.Row="1" Content="Remove" Style="{StaticResource CareBtn}" Background="#64748B" Padding="5,2" FontSize="11" Click="BtnRemWebAllow_Click"/>
                                 </Grid>
                             </Grid>
                         </Border>
@@ -358,11 +360,17 @@
                 </StackPanel>
 
                 <StackPanel x:Name="PageEyeCure" Grid.Row="1" Margin="40,20,40,40" Visibility="Collapsed">
-                    <TextBlock Text="Display Settings" FontSize="24" FontWeight="Bold" Foreground="{StaticResource PrimaryTeal}"/>
+                    <TextBlock Text="💻 Display Settings" FontSize="24" FontWeight="Bold" Foreground="{StaticResource PrimaryTeal}"/>
                 </StackPanel>
                 
                 <StackPanel x:Name="PagePomodoro" Grid.Row="1" Margin="40,20,40,40" Visibility="Collapsed">
-                    <TextBlock Text="Pomodoro Timer" FontSize="24" FontWeight="Bold" Foreground="{StaticResource PrimaryTeal}"/>
+                    <TextBlock Text="🍅 Pomodoro Timer" FontSize="24" FontWeight="Bold" Foreground="{StaticResource PrimaryTeal}" Margin="0,0,0,20"/>
+                    <TextBlock Text="Stay focused for 25 minutes, then take a 5-minute break!" FontSize="14" Foreground="#475569" Margin="0,0,0,20"/>
+                    
+                    <StackPanel Orientation="Horizontal">
+                        <Button Content="START POMODORO" Style="{StaticResource CareBtn}" Background="#10B981" Padding="20,10" Margin="0,0,15,0" Click="BtnPomoStart_Click"/>
+                        <Button Content="STOP POMODORO" Style="{StaticResource CareBtn}" Background="#EF4444" Padding="20,10" Click="BtnPomoStop_Click"/>
+                    </StackPanel>
                 </StackPanel>
 
             </Grid>
