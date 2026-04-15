@@ -4,23 +4,25 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
+using System.Windows.Automation;
+using Microsoft.Win32;
 
 namespace RasFocusPro
 {
     public partial class MainWindow : Window
     {
-        // ==========================================
-        // WINDOWS NATIVE API (P/Invoke)
-        // ==========================================
+        #region WINDOWS NATIVE API (P/Invoke)
         [DllImport("user32.dll")]
         private static extern IntPtr GetForegroundWindow();
 
@@ -57,31 +59,31 @@ namespace RasFocusPro
         [DllImport("user32.dll")]
         static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
 
-        // Constants
         private const int SW_MINIMIZE = 6;
         private const int WH_KEYBOARD_LL = 13;
         private const int WM_KEYDOWN = 0x0100;
         private const byte VK_CONTROL = 0x11;
         private const uint KEYEVENTF_KEYUP = 0x0002;
         private const int HWND_BROADCAST = 0xffff;
-
         private static uint WM_WAKEUP = RegisterWindowMessage("RasFocusPro_Wakeup");
+        #endregion
 
-        // ==========================================
-        // GLOBALS & DATA
-        // ==========================================
+        #region GLOBALS & DATA
         private DispatcherTimer fastTimer;
         private DispatcherTimer slowTimer;
         private DispatcherTimer syncTimer;
+        private static readonly HttpClient httpClient = new HttpClient();
 
         private bool isSessionActive = false, isTimeMode = false, isPassMode = false, useAllowMode = false;
         private bool blockReels = false, blockShorts = false, isAdblockActive = false, blockAdult = true;
         private bool isPomodoroMode = false, isPomodoroBreak = false;
+        private bool isLicenseValid = true, isTrialExpired = false;
 
         private int focusTimeTotalSeconds = 0, timerTicks = 0;
         private int pomoLengthMin = 25, pomoTotalSessions = 4, pomoCurrentSession = 1, pomoTicks = 0;
-        
+        private int trialDaysLeft = 174;
         private string currentSessionPass = "", userProfileName = "Rasel Mia";
+        private string deviceIdCache = "";
 
         private List<string> blockedApps = new List<string>();
         private List<string> blockedWebs = new List<string>();
@@ -96,47 +98,50 @@ namespace RasFocusPro
             "খাসি", "চটি", "যৌন", "নগ্ন", "উলঙ্গ", "মেয়েদের ছবি", "গরম ভিডিও", "নষ্ট ভিডিও", "নোংরা ভিডিও", "খারাপ ছবি", "পর্ন", "যৌনতা", "choti golpo", "bangla sex", "meyeder chobi", "nongra video", "gorom video", "kapor chara chobi", "bangla hot", "boudi video", "deshi sexy", "biye barir dance", "মাগি", "পটানো", "সেক্সি নাচ", "অশ্লীল", "অশ্লীল ভিডিও", "বৌদি", "দেবর বৌদি", "ভাবি", "গোপন ভিডিও", "ভাইরাল ভিডিও"
         };
 
+        private List<string> adultDomains = new List<string> {
+            "pornhub.com", "xvideos.com", "xnxx.com", "xhamster.com", "chaturbate.com",
+            "spankbang.com", "redtube.com", "youporn.com", "eporner.com", "hqporner.com",
+            "brazzers.com", "onlyfans.com", "rule34.video", "tube8.com", "xhamsterlive.com", "xncx.com", "desi.com"
+        };
+
         private string[] islamicQuotes = { 
-            "\"মুমিনদের বলুন, তারা যেন তাদের দৃষ্টি নত রাখে এবং তাদের যৌনাঙ্গর হেফাযত করে।\" - (সূরা আন-নূর: ৩০)", 
-            "\"লজ্জাশীলতা কল্যাণ ছাড়া আর কিছুই বয়ে আনে না।\" - (সহীহ বুখারী)"
             "\"মুমিনদের বলুন, তারা যেন তাদের দৃষ্টি নত রাখে এবং তাদের যৌনাঙ্গর হেফাযত করে।\"", 
             "\"লজ্জাশীলতা কল্যাণ ছাড়া আর কিছুই বয়ে আনে না।\"",
-            "\"তোমরা অশ্লীলতার ধারেকাছেও যেও না, নিশ্চয়ই এটা চরম নিকৃষ্ট পথ।\"",
+            "\"তোমরা অশ্লীলতার ধারেকাছেও যেও না, নিশ্চয়ই এটা চরম নিকৃষ্ট পথ।\"",
             "\"যে ব্যক্তি নিজের জিহ্বা ও লজ্জাস্থানের হেফাজত করবে, তার জন্য জান্নাতের সুসংবাদ।\"",
             "\"চোখের ব্যভিচার হলো হারাম জিনিসের দিকে দৃষ্টিপাত করা, তাই দৃষ্টিকে সংযত রাখো।\"",
             "\"অশ্লীলতা যে কোনো জিনিসকে কলুষিত করে, আর শালীনতা যে কোনো জিনিসকে সুন্দর করে তোলে।\"",
-            "\"লজ্জা ও ঈমান একে অপরের সাথে ওতপ্রোতভাবে জড়িত, একটি বিদায় নিলে অপরটিও বিদায় নেয়।\"",
-            "\"যে ব্যক্তি হারাম দৃষ্টি থেকে নিজের চোখকে ফিরিয়ে নেয়, সৃষ্টিকর্তা তার অন্তরে ঈমানের এক অপূর্ব স্বাদ ঢেলে দেন।\"",
-            "\"ক্ষণিকের হারাম আনন্দ দীর্ঘস্থায়ী অনুশোচনার কারণ হয়, তাই নফস থেকে নিজেকে বাঁচিয়ে রাখো।\"",
-            "\"সবচেয়ে বড় যুদ্ধ হলো নিজের খারাপ প্রবৃত্তির বিরুদ্ধে লড়াই করা।\"",
-            "\"নির্জনে করা পাপও গোপন থাকে না, কারণ উপরওয়ালা সব দেখেন এবং সব জানেন।\"",
+            "\"লজ্জা ও ঈমান একে অপরের সাথে ওতপ্রোতভাবে জড়িত, একটি বিদায় নিলে অপরটিও বিদায় নেয়।\"",
+            "\"যে ব্যক্তি হারাম দৃষ্টি থেকে নিজের চোখকে ফিরিয়ে নেয়, সৃষ্টিকর্তা তার অন্তরে ঈমানের এক অপূর্ব স্বাদ ঢেলে দেন।\"",
+            "\"ক্ষণিকের হারাম আনন্দ দীর্ঘস্থায়ী অনুশোচনার কারণ হয়, তাই নফস থেকে নিজেকে বাঁচিয়ে রাখো।\"",
+            "\"সবচেয়ে বড় যুদ্ধ হলো নিজের খারাপ প্রবৃত্তির বিরুদ্ধে লড়াই করা।\"",
+            "\"নির্জনে করা পাপও গোপন থাকে না, কারণ উপরওয়ালা সব দেখেন এবং সব জানেন।\"",
             "\"যে ব্যক্তি নির্জনে পাপ থেকে বিরত থাকে, তাকে প্রকাশ্যে সম্মানিত করা হয়।\"",
             "\"নিশ্চয়ই সৃষ্টিকর্তা তওবাকারীদের ভালোবাসেন এবং যারা পবিত্র থাকে তাদেরও ভালোবাসেন।\"",
-            "\"অন্তর যখন কলুষিত হয়, তখন মানুষের দৃষ্টিও তার পবিত্রতা হারিয়ে ফেলে।\"",
-            "\"খারাপ চিন্তা ও দৃষ্টি থেকে নিজেকে দূরে রাখো, কারণ এগুলোই অন্তরের প্রশান্তি নষ্ট করে দেয়।\""
+            "\"অন্তর যখন কলুষিত হয়, তখন মানুষের দৃষ্টিও তার পবিত্রতা হারিয়ে ফেলে।\"",
+            "\"খারাপ চিন্তা ও দৃষ্টি থেকে নিজেকে দূরে রাখো, কারণ এগুলোই অন্তরের প্রশান্তি নষ্ট করে দেয়।\""
         };
-       private string[] timeQuotes = { 
-    "\"যারা সময়কে মূল্যায়ন করে না, সময়ও তাদেরকে মূল্যায়ন করে না।\"",
-    "\"অতীত চলে গেছে, ভবিষ্যৎ এখনও আসেনি, তোমার কাছে আছে শুধু বর্তমান। তাই এখনই কাজ শুরু করো।\"",
-    "\"সময় বিনামূল্যে পাওয়া যায় ঠিকই, কিন্তু এর মূল্য আসলে অমূল্য।\"",
-    "\"তুমি সময়কে ধরে রাখতে পারবে না, কিন্তু তুমি একে সঠিকভাবে ব্যবহার করতে পারো।\"",
-    "\"যে আজ সময় নষ্ট করছে, কাল সময় তাকে নষ্ট করবে।\"",
-    "\"সফলতা আর ব্যর্থতার মধ্যে সবচেয়ে বড় পার্থক্য হলো সময়ের সঠিক ব্যবহার।\"",
-    "\"তুমি যদি সময়কে হত্যা করো, তবে সময় তোমার স্বপ্নগুলোকে হত্যা করবে।\"",
-    "\"আজকের কাজ কালকের জন্য ফেলে রাখা মানে নিজের সাফল্যের পথকে পিছিয়ে দেওয়া।\"",
-    "\"প্রতিটি সেকেন্ড একটি নতুন সুযোগ, একে কাজে লাগাও।\"",
-    "\"যে ব্যক্তি জীবনের একটি ঘণ্টাও নষ্ট করতে দ্বিধা করে না, সে জীবনের আসল মূল্যই বোঝেনি।\"",
-    "\"সফল মানুষেরা কখনো সময় কাটানোর বাহানা খোঁজে না।\"",
-    "\"ঘড়ির কাঁটা কখনো থামে না, তাই তোমার লক্ষ্য পূরণের কাজও থামা উচিত নয়।\"",
-    "\"অলসতা হলো সময়ের সবচেয়ে বড় শত্রু, আর ফোকাস হলো সবচেয়ে বড় হাতিয়ার।\"",
-    "\"বড় কিছু অর্জন করতে হলে সবচেয়ে আগে নিজের সময়ের নিয়ন্ত্রণ নিতে হবে।\"",
-    "\"জীবন একটাই এবং সময় সীমিত। তাই অহেতুক কাজে নিজের এই মূল্যবান সময় নষ্ট কোরো না।\""
-}; 
+
+        private string[] timeQuotes = { 
+            "\"যারা সময়কে মূল্যায়ন করে না, সময়ও তাদেরকে মূল্যায়ন করে না।\"",
+            "\"অতীত চলে গেছে, ভবিষ্যৎ এখনও আসেনি, তোমার কাছে আছে শুধু বর্তমান। তাই এখনই কাজ শুরু করো।\"",
+            "\"সময় বিনামূল্যে পাওয়া যায় ঠিকই, কিন্তু এর মূল্য আসলে অমূল্য।\"",
+            "\"তুমি সময়কে ধরে রাখতে পারবে না, কিন্তু তুমি একে সঠিকভাবে ব্যবহার করতে পারো।\"",
+            "\"যে আজ সময় নষ্ট করছে, কাল সময় তাকে নষ্ট করবে।\"",
+            "\"সফলতা আর ব্যর্থতার মধ্যে সবচেয়ে বড় পার্থক্য হলো সময়ের সঠিক ব্যবহার।\"",
+            "\"তুমি যদি সময়কে হত্যা করো, তবে সময় তোমার স্বপ্নগুলোকে হত্যা করবে।\"",
+            "\"আজকের কাজ কালকের জন্য ফেলে রাখা মানে নিজের সাফল্যের পথকে পিছিয়ে দেওয়া।\"",
+            "\"প্রতিটি সেকেন্ড একটি নতুন সুযোগ, একে কাজে লাগাও।\"",
+            "\"যে ব্যক্তি জীবনের একটি ঘণ্টাও নষ্ট করতে দ্বিধা করে না, সে জীবনের আসল মূল্যই বোঝেনি।\"",
+            "\"সফল মানুষেরা কখনো সময় কাটানোর বাহানা খোঁজে না।\"",
+            "\"ঘড়ির কাঁটা কখনো থামে না, তাই তোমার লক্ষ্য পূরণের কাজও থামা উচিত নয়।\"",
+            "\"অলসতা হলো সময়ের সবচেয়ে বড় শত্রু, আর ফোকাস হলো সবচেয়ে বড় হাতিয়ার।\"",
+            "\"বড় কিছু অর্জন করতে হলে সবচেয়ে আগে নিজের সময়ের নিয়ন্ত্রণ নিতে হবে।\"",
+            "\"জীবন একটাই এবং সময় সীমিত। তাই অহেতুক কাজে নিজের এই মূল্যবান সময় নষ্ট কোরো না।\""
         };
 
         private string secretDir;
         private Window overlayWindow = null;
-
         private System.Windows.Forms.NotifyIcon trayIcon;
 
         // Keyboard Hook Setup
@@ -146,6 +151,7 @@ namespace RasFocusPro
         private static string globalKeyBuffer = "";
         private static MainWindow _instance; 
         private static Mutex _mutex = null;
+        #endregion
 
         public MainWindow()
         {
@@ -161,9 +167,13 @@ namespace RasFocusPro
 
             InitializeComponent();
             _instance = this;
+            deviceIdCache = GetDeviceID();
             
             secretDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RasFocusPro");
             Directory.CreateDirectory(secretDir);
+
+            // Setup AutoStart via Registry
+            SetupAutoStart(true);
 
             LoadData();
             RefreshRunningApps();
@@ -173,6 +183,15 @@ namespace RasFocusPro
             _proc = HookCallback;
             _hookID = SetHook(_proc);
 
+            // Check if started silently via PC Boot
+            string[] args = Environment.GetCommandLineArgs();
+            if (args.Contains("-autostart"))
+            {
+                this.WindowState = WindowState.Minimized;
+                this.Hide();
+            }
+
+            // Init Timers
             fastTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
             fastTimer.Tick += FastLoop_Tick;
             fastTimer.Start();
@@ -184,6 +203,13 @@ namespace RasFocusPro
             syncTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
             syncTimer.Tick += SyncLoop_Tick;
             syncTimer.Start();
+
+            // Firebase Registration
+            _ = RegisterDeviceToFirebase();
+
+            // UI Init
+            RadioBlockList.IsChecked = !useAllowMode;
+            RadioAllowList.IsChecked = useAllowMode;
         }
 
         protected override void OnSourceInitialized(EventArgs e)
@@ -210,9 +236,100 @@ namespace RasFocusPro
             base.OnClosed(e);
         }
 
-        // ==========================================
-        // SYSTEM TRAY LOGIC
-        // ==========================================
+        #region REGISTRY & SYSTEM MANIPULATION (AutoStart & Adblocker)
+        private void SetupAutoStart(bool enable)
+        {
+            try
+            {
+                using (RegistryKey key = Registry.CurrentUser.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", true))
+                {
+                    string appPath = "\"" + System.Reflection.Assembly.GetExecutingAssembly().Location + "\" -autostart";
+                    if (enable)
+                        key.SetValue("RasFocusPro", appPath);
+                    else
+                        key.DeleteValue("RasFocusPro", false);
+                }
+            }
+            catch { }
+        }
+
+        private void ToggleAdBlockRegistry(bool enable)
+        {
+            try
+            {
+                // Silently Force Install uBlock Origin via Registry (Chrome)
+                using (RegistryKey key = Registry.CurrentUser.CreateSubKey(@"SOFTWARE\Policies\Google\Chrome\ExtensionInstallForcelist"))
+                {
+                    if (enable) key.SetValue("1", "cjpalhdlnbpafiamejdnhcphjbkeiagm;https://clients2.google.com/service/update2/crx");
+                    else key.DeleteValue("1", false);
+                }
+                // (Edge)
+                using (RegistryKey key = Registry.CurrentUser.CreateSubKey(@"SOFTWARE\Policies\Microsoft\Edge\ExtensionInstallForcelist"))
+                {
+                    if (enable) key.SetValue("1", "odfafepnkmbhccpbejgmiehpchacaeak;https://edge.microsoft.com/extensionwebstorebase/v1/crx");
+                    else key.DeleteValue("1", false);
+                }
+            }
+            catch { }
+        }
+        #endregion
+
+        #region FIREBASE HTTP CONTROLLER
+        private string GetDeviceID()
+        {
+            string machine = Environment.MachineName;
+            string user = Environment.UserName;
+            return $"{machine}-{user}".Replace(" ", "_");
+        }
+
+        private async Task RegisterDeviceToFirebase()
+        {
+            try
+            {
+                string url = $"https://firestore.googleapis.com/v1/projects/mywebtools-f8d53/databases/(default)/documents/subscription_requests/{deviceIdCache}?key=AIzaSyDGd3KAo45UuqmeGFALziz_oKm3htEASHY";
+                string jsonBody = $@"{{
+                    ""fields"": {{
+                        ""deviceID"": {{ ""stringValue"": ""{deviceIdCache}"" }},
+                        ""status"": {{ ""stringValue"": ""ACTIVE"" }},
+                        ""profileName"": {{ ""stringValue"": ""{userProfileName}"" }}
+                    }}
+                }}";
+                var content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
+                await httpClient.PatchAsync(url, content);
+            }
+            catch { }
+        }
+
+        private async void SyncProfileNameToFirebase(string name)
+        {
+            try
+            {
+                string url = $"https://firestore.googleapis.com/v1/projects/mywebtools-f8d53/databases/(default)/documents/subscription_requests/{deviceIdCache}?updateMask.fieldPaths=profileName&key=AIzaSyDGd3KAo45UuqmeGFALziz_oKm3htEASHY";
+                string jsonBody = $@"{{ ""fields"": {{ ""profileName"": {{ ""stringValue"": ""{name}"" }} }} }}";
+                await httpClient.PatchAsync(url, new StringContent(jsonBody, Encoding.UTF8, "application/json"));
+            }
+            catch { }
+        }
+
+        private async void SyncTogglesToFirebase()
+        {
+            try
+            {
+                string url = $"https://firestore.googleapis.com/v1/projects/mywebtools-f8d53/databases/(default)/documents/subscription_requests/{deviceIdCache}?updateMask.fieldPaths=fbReelsBlock&updateMask.fieldPaths=ytShortsBlock&updateMask.fieldPaths=adBlock&key=AIzaSyDGd3KAo45UuqmeGFALziz_oKm3htEASHY";
+                string jsonBody = $@"{{
+                    ""fields"": {{
+                        ""fbReelsBlock"": {{ ""booleanValue"": {blockReels.ToString().ToLower()} }},
+                        ""ytShortsBlock"": {{ ""booleanValue"": {blockShorts.ToString().ToLower()} }},
+                        ""adBlock"": {{ ""booleanValue"": {isAdblockActive.ToString().ToLower()} }}
+                    }}
+                }}";
+                await httpClient.PatchAsync(url, new StringContent(jsonBody, Encoding.UTF8, "application/json"));
+            }
+            catch { }
+        }
+        #endregion
+
+        #region SYSTEM TRAY LOGIC
         private void SetupTrayIcon()
         {
             trayIcon = new System.Windows.Forms.NotifyIcon();
@@ -250,10 +367,9 @@ namespace RasFocusPro
             this.Topmost = false; 
             this.Focus();
         }
+        #endregion
 
-        // ==========================================
-        // UI POPULATE & EVENT HANDLERS
-        // ==========================================
+        #region UI EVENT HANDLERS & POPULATION
         private void PopulateComboBoxes()
         {
             string[] popSites = { "Select..", "facebook.com", "youtube.com", "instagram.com", "tiktok.com", "reddit.com" };
@@ -265,12 +381,16 @@ namespace RasFocusPro
             ComboWebBlock.SelectedIndex = 0; ComboWebAllow.SelectedIndex = 0;
             ComboAppBlock.SelectedIndex = 0; ComboAppAllow.SelectedIndex = 0;
             
-            // Checkbox and Radio logic setup based on loaded data
-            RadioAllowList.IsChecked = useAllowMode;
-            RadioBlockList.IsChecked = !useAllowMode;
             ChkBlockReels.IsChecked = blockReels;
             ChkBlockShorts.IsChecked = blockShorts;
             ChkAdBlock.IsChecked = isAdblockActive;
+        }
+
+        private void RadioList_Checked(object sender, RoutedEventArgs e)
+        {
+            if (isSessionActive) return;
+            useAllowMode = (RadioAllowList.IsChecked == true);
+            SaveData();
         }
 
         private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) { DragMove(); }
@@ -281,6 +401,12 @@ namespace RasFocusPro
             trayIcon.ShowBalloonTip(2000, "RasFocus Pro", "Running securely in the background...", System.Windows.Forms.ToolTipIcon.Info);
         }
 
+        // ============= NAVIGATION BUTTONS =============
+        private void BtnNavLiveChat_Click(object sender, RoutedEventArgs e) { SidebarList.SelectedIndex = 4; }
+        private void BtnNavUpgrade_Click(object sender, RoutedEventArgs e) { SidebarList.SelectedIndex = 5; }
+        private void BtnNavPomodoro_Click(object sender, RoutedEventArgs e) { SidebarList.SelectedIndex = 2; }
+        private void BtnNavEyeCure_Click(object sender, RoutedEventArgs e) { SidebarList.SelectedIndex = 1; }
+
         private void SidebarList_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (PageFocusMode == null) return;
@@ -288,17 +414,31 @@ namespace RasFocusPro
             PageFocusMode.Visibility = index == 0 ? Visibility.Visible : Visibility.Collapsed;
             PageEyeCure.Visibility = index == 1 ? Visibility.Visible : Visibility.Collapsed;
             PagePomodoro.Visibility = index == 2 ? Visibility.Visible : Visibility.Collapsed;
+            // PageSettings, PageLiveChat, PageActivatePro visibility logic will go here if added to XAML
         }
 
         private void BtnSave_Click(object sender, RoutedEventArgs e)
         {
             userProfileName = TxtProfileName.Text;
-            System.Windows.MessageBox.Show("Profile Name Saved!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+            SyncProfileNameToFirebase(userProfileName);
+            System.Windows.MessageBox.Show("Profile Name Saved Successfully to Cloud!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
-        // ==========================================
-        // FOCUS & POMODORO START/STOP
-        // ==========================================
+        // Fast Action Checkboxes
+        private void FastToggles_Click(object sender, RoutedEventArgs e)
+        {
+            blockReels = ChkBlockReels.IsChecked == true;
+            blockShorts = ChkBlockShorts.IsChecked == true;
+            if (isAdblockActive != (ChkAdBlock.IsChecked == true))
+            {
+                isAdblockActive = ChkAdBlock.IsChecked == true;
+                ToggleAdBlockRegistry(isAdblockActive); // Apply to Registry silently
+            }
+            SyncTogglesToFirebase();
+        }
+        #endregion
+
+        #region FOCUS & POMODORO START/STOP
         private void BtnStart_Click(object sender, RoutedEventArgs e)
         {
             if (isSessionActive) return;
@@ -323,8 +463,9 @@ namespace RasFocusPro
                 
                 SaveData();
                 UpdateUIStates();
+                FastToggles_Click(null, null); // Sync toggles
                 
-                System.Windows.MessageBox.Show("Focus Mode Active. Unauthorized apps and websites are now blocked.", "RasFocus Pro Security", MessageBoxButton.OK, MessageBoxImage.Information);
+                System.Windows.MessageBox.Show("Focus Mode Active. Unauthorized apps and websites are now blocked.", "Security", MessageBoxButton.OK, MessageBoxImage.Information);
                 this.Hide(); 
             }
             else
@@ -363,7 +504,8 @@ namespace RasFocusPro
                 isSessionActive = true;
                 pomoTicks = 0;
                 pomoCurrentSession = 1;
-                useAllowMode = true; // Force allow mode for Pomodoro
+                useAllowMode = true; // Pomodoro always runs on Allow List
+                RadioAllowList.IsChecked = true;
                 
                 SaveData();
                 UpdateUIStates();
@@ -400,16 +542,49 @@ namespace RasFocusPro
             LblStatus.Text = isSessionActive ? "Focus Active!" : "Ready";
             LblStatus.Foreground = isSessionActive ? new SolidColorBrush(Colors.Green) : new SolidColorBrush(Colors.Red);
             
-            // Disable inputs while active
             RadioBlockList.IsEnabled = !isSessionActive;
             RadioAllowList.IsEnabled = !isSessionActive;
             BtnStartFocus.IsEnabled = !isSessionActive;
             BtnStopFocus.IsEnabled = isSessionActive;
+            
+            TxtAppBlock.IsEnabled = !isSessionActive;
+            TxtWebBlock.IsEnabled = !isSessionActive;
+            TxtAppAllow.IsEnabled = !isSessionActive;
+            TxtWebAllow.IsEnabled = !isSessionActive;
+            BtnAddAppBlock.IsEnabled = !isSessionActive;
+            BtnAddWebBlock.IsEnabled = !isSessionActive;
+            BtnAddAppAllow.IsEnabled = !isSessionActive;
+            BtnAddWebAllow.IsEnabled = !isSessionActive;
+            BtnRemAppBlock.IsEnabled = !isSessionActive;
+            BtnRemWebBlock.IsEnabled = !isSessionActive;
+            BtnRemAppAllow.IsEnabled = !isSessionActive;
+            BtnRemWebAllow.IsEnabled = !isSessionActive;
+        }
+        #endregion
+
+        #region BACKGROUND LOGIC (URL READER & TIMERS)
+        private string GetActiveTabUrl(IntPtr hwnd)
+        {
+            try
+            {
+                AutomationElement elm = AutomationElement.FromHandle(hwnd);
+                AutomationElement elmUrlBar = elm.FindFirst(TreeScope.Descendants,
+                    new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Edit));
+
+                if (elmUrlBar != null)
+                {
+                    AutomationPattern[] patterns = elmUrlBar.GetSupportedPatterns();
+                    if (patterns.Length > 0)
+                    {
+                        ValuePattern val = (ValuePattern)elmUrlBar.GetCurrentPattern(ValuePattern.Pattern);
+                        return val.Current.Value.ToLower();
+                    }
+                }
+            }
+            catch { }
+            return "";
         }
 
-        // ==========================================
-        // BACKGROUND LOGIC (TIMERS)
-        // ==========================================
         private void FastLoop_Tick(object sender, EventArgs e)
         {
             if (!blockAdult && !blockReels && !blockShorts && !isSessionActive) return;
@@ -422,39 +597,72 @@ namespace RasFocusPro
                 GetWindowText(hWnd, title, 512);
                 string sTitle = title.ToString().ToLower();
 
-                // 1. Explicit Keywords Block
-                if (blockAdult && explicitKeywords.Any(k => sTitle.Contains(k)))
+                bool isBrowser = sTitle.Contains("chrome") || sTitle.Contains("edge") || 
+                                 sTitle.Contains("firefox") || sTitle.Contains("brave") || 
+                                 sTitle.Contains("opera");
+
+                string activeUrl = "";
+                if (isBrowser)
                 {
-                    CloseWindowNatively(hWnd);
-                    ShowOverlay(GetRandomQuote(1));
-                    return;
+                    activeUrl = GetActiveTabUrl(hWnd); 
                 }
 
-                // 2. Social Media Block
-                if (blockReels && sTitle.Contains("facebook") && sTitle.Contains("reel")) { CloseWindowNatively(hWnd); ShowOverlay(GetRandomQuote(2)); return; }
-                if (blockShorts && sTitle.Contains("youtube") && sTitle.Contains("shorts")) { CloseWindowNatively(hWnd); ShowOverlay(GetRandomQuote(2)); return; }
-
-                // 3. Focus Mode Logic
-                if (isSessionActive)
+                // 1. Explicit Keywords Block & Adult Domain Block
+                if (blockAdult)
                 {
-                    bool isBrowser = sTitle.Contains("chrome") || sTitle.Contains("edge") || sTitle.Contains("firefox") || sTitle.Contains("brave");
-                    if (isBrowser)
+                    bool isAdultMatch = explicitKeywords.Any(k => sTitle.Contains(k));
+                    if (!isAdultMatch && isBrowser && !string.IsNullOrEmpty(activeUrl))
                     {
-                        if (useAllowMode)
+                        isAdultMatch = adultDomains.Any(d => activeUrl.Contains(d));
+                    }
+
+                    if (isAdultMatch)
+                    {
+                        CloseWindowNatively(hWnd);
+                        ShowOverlay(GetRandomQuote(1));
+                        return;
+                    }
+                }
+
+                // 2. Facebook Reels Block (URL check included)
+                if (blockReels && isBrowser)
+                {
+                    if (activeUrl.Contains("facebook.com/reel") || (sTitle.Contains("facebook") && sTitle.Contains("reel")))
+                    {
+                        CloseWindowNatively(hWnd);
+                        ShowOverlay(GetRandomQuote(2));
+                        return;
+                    }
+                }
+
+                // 3. YouTube Shorts Block (URL check included)
+                if (blockShorts && isBrowser)
+                {
+                    if (activeUrl.Contains("youtube.com/shorts") || (sTitle.Contains("youtube") && sTitle.Contains("shorts")))
+                    {
+                        CloseWindowNatively(hWnd);
+                        ShowOverlay(GetRandomQuote(2));
+                        return;
+                    }
+                }
+
+                // 4. Focus Mode Custom Website Logic
+                if (isSessionActive && isBrowser)
+                {
+                    if (useAllowMode)
+                    {
+                        if (!allowedWebs.Any(w => sTitle.Contains(w.ToLower()) || activeUrl.Contains(w.ToLower())) && !sTitle.Contains("allowed websites"))
                         {
-                            if (!allowedWebs.Any(w => sTitle.Contains(w.ToLower())) && !sTitle.Contains("allowed websites"))
-                            {
-                                CloseWindowNatively(hWnd);
-                                ShowOverlay("Website not in Allow List!");
-                            }
+                            CloseWindowNatively(hWnd);
+                            ShowOverlay("Website not in Allow List!");
                         }
-                        else
+                    }
+                    else
+                    {
+                        if (blockedWebs.Any(w => sTitle.Contains(w.ToLower()) || activeUrl.Contains(w.ToLower())))
                         {
-                            if (blockedWebs.Any(w => sTitle.Contains(w.ToLower())))
-                            {
-                                CloseWindowNatively(hWnd);
-                                ShowOverlay("Website Blocked by Focus Mode!");
-                            }
+                            CloseWindowNatively(hWnd);
+                            ShowOverlay("Website Blocked by Focus Mode!");
                         }
                     }
                 }
@@ -508,7 +716,10 @@ namespace RasFocusPro
                 if (left < 0) left = 0;
 
                 TimeSpan t = TimeSpan.FromSeconds(left);
-                LblStatus.Text = string.Format("Pomo: {0:D2}:{1:D2}", t.Minutes, t.Seconds);
+                // Ensure Label update works on UI Thread safely
+                Dispatcher.Invoke(() => { 
+                    LblStatus.Text = string.Format("Pomo: {0:D2}:{1:D2}", t.Minutes, t.Seconds); 
+                });
 
                 if (!isPomodoroBreak && pomoTicks >= pomoLengthMin * 60)
                 {
@@ -533,13 +744,14 @@ namespace RasFocusPro
                 int left = focusTimeTotalSeconds - timerTicks;
                 if (left < 0) left = 0;
                 TimeSpan t = TimeSpan.FromSeconds(left);
-                LblStatus.Text = string.Format("Time: {0:D2}:{1:D2}:{2:D2}", t.Hours, t.Minutes, t.Seconds);
+                Dispatcher.Invoke(() => { 
+                    LblStatus.Text = string.Format("Time: {0:D2}:{1:D2}:{2:D2}", t.Hours, t.Minutes, t.Seconds); 
+                });
             }
         }
+        #endregion
 
-        // ==========================================
-        // LIST MANAGEMENT (ADD/REMOVE)
-        // ==========================================
+        #region LIST MANAGEMENT (ADD/REMOVE)
         private void AddToList(TextBox input, ListBox list, List<string> dataList, string fileName)
         {
             string val = input.Text.Trim();
@@ -601,10 +813,9 @@ namespace RasFocusPro
                 }
             }
         }
+        #endregion
 
-        // ==========================================
-        // UTILITIES & NATIVE HELPERS
-        // ==========================================
+        #region UTILITIES & NATIVE HELPERS
         private string GetRandomQuote(int type)
         {
             Random r = new Random();
@@ -654,10 +865,9 @@ namespace RasFocusPro
             t.Tick += (s, ev) => { overlayWindow.Hide(); t.Stop(); };
             t.Start();
         }
+        #endregion
 
-        // ==========================================
-        // REAL-TIME KEYBOARD HOOK (TYPING BLOCKER)
-        // ==========================================
+        #region REAL-TIME KEYBOARD HOOK (TYPING BLOCKER)
         private static IntPtr SetHook(LowLevelKeyboardProc proc)
         {
             using (Process curProcess = Process.GetCurrentProcess())
@@ -694,10 +904,9 @@ namespace RasFocusPro
             }
             return CallNextHookEx(_hookID, nCode, wParam, lParam);
         }
+        #endregion
 
-        // ==========================================
-        // DATA SAVE/LOAD
-        // ==========================================
+        #region DATA SAVE/LOAD
         private void SaveData()
         {
             SaveListToFile(blockedApps, "bl_app.txt");
@@ -729,5 +938,6 @@ namespace RasFocusPro
                 foreach (var item in dataList) uiList.Items.Add(item);
             }
         }
+        #endregion
     }
 }
