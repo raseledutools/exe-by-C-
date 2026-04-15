@@ -82,7 +82,7 @@ namespace RasFocusPro
         private DispatcherTimer syncTimer;
         
         private bool isSessionActive = false, isTimeMode = false, isPassMode = false, useAllowMode = false;
-        private bool blockReels = false, blockShorts = false, isAdblockActive = false, blockAdult = true;
+        private bool blockreel = false, blockShorts = false, isAdblockActive = false, blockAdult = true;
         private bool isPomodoroMode = false, isPomodoroBreak = false;
         
         private int focusTimeTotalSeconds = 0, timerTicks = 0;
@@ -103,7 +103,7 @@ namespace RasFocusPro
         // Adult, Dance & Bangla Bad Words
         private List<string> explicitKeywords = new List<string> {
             "porn", "xxx", "sex", "nude", "nsfw", "xvideos", "pornhub", "xnxx", "xhamster", "brazzers", "onlyfans", "playboy", "mia khalifa", "bhabi", "chudai", "bangla choti", "magi", "sexy",
-            "hot video", "hot scene", "desi", "boudi", "devar", "item song", "item dance", "mujra", "belly dance", "bikini", "romance", "kissing", "ullu", "web series", "ullongo", "kapor chara", "tiktok dance", "dj dance", "hot dance", "nongra dance",
+            "hot video", "hot scene", "desi", "boudi", "reel", "item song", "item dance", "shorts", "belly dance", "bikini", "romance", "kissing", "ullu", "web series", "ullongo", "kapor chara", "tiktok dance", "dj dance", "hot dance", "nongra dance",
             "খাসি", "চটি", "যৌন", "নগ্ন", "উলঙ্গ", "মেয়েদের ছবি", "গরম ভিডিও", "নষ্ট ভিডিও", "নোংরা ভিডিও", "খারাপ ছবি", "পর্ন", "যৌনতা", "choti golpo", "bangla sex", "meyeder chobi", "nongra video", "gorom video", "kapor chara chobi", "bangla hot", "boudi video", "deshi sexy", "biye barir dance", "মাগি", "পটানো", "সেক্সি নাচ", "অশ্লীল", "অশ্লীল ভিডিও", "বৌদি", "দেবর বৌদি", "ভাবি", "গোপন ভিডিও", "ভাইরাল ভিডিও"
         };
         
@@ -332,7 +332,7 @@ namespace RasFocusPro
 
         private void FastLoop_Tick(object sender, EventArgs e)
         {
-            if (!blockAdult && !blockReels && !blockShorts && !isSessionActive) return;
+            if (!blockAdult && !blockReel && !blockShorts && !isSessionActive) return;
             if (overlayWindow != null && overlayWindow.IsVisible) return;
 
             IntPtr hWnd = GetForegroundWindow();
@@ -351,7 +351,7 @@ namespace RasFocusPro
                 }
 
                 // 2. Social Media Block
-                if (blockReels && sTitle.Contains("facebook") && sTitle.Contains("reels")) { CloseWindowNatively(hWnd); ShowOverlay(GetRandomQuote(2)); return; }
+                if (blockreel && sTitle.Contains("facebook") && sTitle.Contains("reel")) { CloseWindowNatively(hWnd); ShowOverlay(GetRandomQuote(2)); return; }
                 if (blockShorts && sTitle.Contains("youtube") && sTitle.Contains("shorts")) { CloseWindowNatively(hWnd); ShowOverlay(GetRandomQuote(2)); return; }
 
                 // 3. Focus Mode Logic
