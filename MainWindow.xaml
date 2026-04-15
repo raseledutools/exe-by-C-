@@ -1,23 +1,24 @@
 <Window x:Class="RasFocusPro.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="RasFocus Pro" Height="720" Width="1100"
+        Title="RasFocus Pro" Height="680" Width="1024"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         WindowStartupLocation="CenterScreen" MouseLeftButtonDown="Window_MouseLeftButtonDown"
         TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType">
 
     <Window.Resources>
-        <SolidColorBrush x:Key="PrimaryTeal" Color="#14B8C8"/>
-        <SolidColorBrush x:Key="DarkText" Color="#333333"/>
+        <SolidColorBrush x:Key="PrimaryTeal" Color="#0EA5E9"/> <SolidColorBrush x:Key="DarkText" Color="#1E293B"/>
         <SolidColorBrush x:Key="LightBg" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="CardBg" Color="#F8FAFC"/>
 
         <Style TargetType="TextBox">
             <Setter Property="Background" Value="{StaticResource LightBg}"/>
             <Setter Property="Foreground" Value="{StaticResource DarkText}"/>
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Padding" Value="6,4"/>
             <Setter Property="BorderBrush" Value="#CBD5E1"/>
             <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TextBox">
@@ -34,16 +35,26 @@
             </Setter>
         </Style>
 
+        <Style TargetType="ComboBox">
+            <Setter Property="Background" Value="{StaticResource LightBg}"/>
+            <Setter Property="Foreground" Value="{StaticResource DarkText}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="BorderBrush" Value="#CBD5E1"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="4,2"/>
+        </Style>
+
         <Style TargetType="Button" x:Key="CareBtn">
             <Setter Property="Background" Value="{StaticResource PrimaryTeal}"/>
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontSize" Value="13"/>
             <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" CornerRadius="6" Padding="12,6">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="6" Padding="10,6">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                     </ControlTemplate>
@@ -62,20 +73,19 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="CheckBox">
                         <StackPanel Orientation="Horizontal">
-                            <Grid Width="40" Height="20">
-                                <Border x:Name="BgBorder" CornerRadius="10" Background="#D1D5DB"/>
-                                <Ellipse x:Name="Thumb" Fill="White" Width="16" Height="16" HorizontalAlignment="Left" Margin="2">
+                            <Grid Width="36" Height="18">
+                                <Border x:Name="BgBorder" CornerRadius="9" Background="#D1D5DB"/>
+                                <Ellipse x:Name="Thumb" Fill="White" Width="14" Height="14" HorizontalAlignment="Left" Margin="2">
                                     <Ellipse.Effect>
                                         <DropShadowEffect BlurRadius="4" ShadowDepth="1" Opacity="0.2"/>
                                     </Ellipse.Effect>
                                 </Ellipse>
                             </Grid>
-                            <ContentPresenter Margin="8,0,0,0" VerticalAlignment="Center" TextBlock.FontSize="13" TextBlock.Foreground="{StaticResource DarkText}"/>
+                            <ContentPresenter Margin="6,0,0,0" VerticalAlignment="Center" TextBlock.FontSize="12" TextBlock.Foreground="{StaticResource DarkText}"/>
                         </StackPanel>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="BgBorder" Property="Background" Value="{StaticResource PrimaryTeal}"/>
-                                <Setter TargetName="Thumb" Property="HorizontalAlignment" Value="Right"/>
+                                <Setter TargetName="BgBorder" Property="Background" Value="#10B981"/> <Setter TargetName="Thumb" Property="HorizontalAlignment" Value="Right"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -84,9 +94,9 @@
         </Style>
     </Window.Resources>
 
-    <Border Background="#F8FAFC" CornerRadius="10" Margin="15">
+    <Border Background="{StaticResource CardBg}" CornerRadius="12" Margin="10">
         <Border.Effect>
-            <DropShadowEffect BlurRadius="15" ShadowDepth="3" Opacity="0.2" Color="Black"/>
+            <DropShadowEffect BlurRadius="20" ShadowDepth="4" Opacity="0.15" Color="Black"/>
         </Border.Effect>
 
         <Grid>
@@ -95,31 +105,32 @@
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <Border Grid.Column="0" Background="{StaticResource PrimaryTeal}" CornerRadius="10,0,0,10">
+            <Border Grid.Column="0" Background="{StaticResource PrimaryTeal}" CornerRadius="12,0,0,12">
                 <StackPanel Margin="0,20,0,0">
                     <StackPanel Orientation="Horizontal" Margin="20,0,0,30">
-                        <TextBlock Text="👁️" FontSize="24" Foreground="White" Margin="0,0,10,0"/>
+                        <TextBlock Text="🛡️" FontSize="26" Foreground="White" Margin="0,0,10,0"/>
                         <TextBlock Text="RasFocus Pro" Foreground="White" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
                     </StackPanel>
 
-                    <ListBox x:Name="SidebarList" Background="Transparent" BorderThickness="0" Foreground="White" FontSize="15" FontWeight="SemiBold" SelectionChanged="SidebarList_SelectionChanged">
+                    <ListBox x:Name="SidebarList" Background="Transparent" BorderThickness="0" Foreground="White" FontSize="14" FontWeight="SemiBold" SelectionChanged="SidebarList_SelectionChanged">
                         <ListBox.ItemContainerStyle>
                             <Style TargetType="ListBoxItem">
-                                <Setter Property="Padding" Value="20,15"/>
+                                <Setter Property="Padding" Value="20,12"/>
                                 <Setter Property="Cursor" Value="Hand"/>
                                 <Setter Property="Template">
                                     <Setter.Value>
                                         <ControlTemplate TargetType="ListBoxItem">
-                                            <Border x:Name="BorderBg" Background="Transparent">
+                                            <Border x:Name="BorderBg" Background="Transparent" CornerRadius="0,20,20,0" Margin="0,0,15,0">
                                                 <ContentPresenter Margin="{TemplateBinding Padding}"/>
                                             </Border>
                                             <ControlTemplate.Triggers>
                                                 <Trigger Property="IsSelected" Value="True">
-                                                    <Setter TargetName="BorderBg" Property="Background" Value="#F8FAFC"/>
+                                                    <Setter TargetName="BorderBg" Property="Background" Value="#FFFFFF"/>
                                                     <Setter Property="Foreground" Value="{StaticResource PrimaryTeal}"/>
                                                 </Trigger>
                                                 <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter TargetName="BorderBg" Property="Background" Value="#17C3D4"/>
+                                                    <Setter TargetName="BorderBg" Property="Background" Value="#38BDF8"/>
+                                                    <Setter Property="Foreground" Value="White"/>
                                                 </Trigger>
                                             </ControlTemplate.Triggers>
                                         </ControlTemplate>
@@ -127,9 +138,9 @@
                                 </Setter>
                             </Style>
                         </ListBox.ItemContainerStyle>
-                        <ListBoxItem IsSelected="True">🛡️  Focus Mode</ListBoxItem>
+                        <ListBoxItem IsSelected="True">🚀  Focus Mode</ListBoxItem>
                         <ListBoxItem>💻  Display / Eye Cure</ListBoxItem>
-                        <ListBoxItem>☕  Pomodoro Break</ListBoxItem>
+                        <ListBoxItem>🍅  Pomodoro Break</ListBoxItem>
                         <ListBoxItem>⚙️  Settings</ListBoxItem>
                         <ListBoxItem>💬  Live Chat</ListBoxItem>
                         <ListBoxItem>⭐  Activate Pro</ListBoxItem>
@@ -139,16 +150,16 @@
 
             <Grid Grid.Column="1">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="40"/>
+                    <RowDefinition Height="35"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
                 <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="10,10,10,0">
-                    <Button Content="—" Background="Transparent" Foreground="#888" FontSize="16" BorderThickness="0" Width="30" Height="30" Cursor="Hand" Click="CloseButton_Click"/>
-                    <Button Content="✕" Background="Transparent" Foreground="#888" FontSize="16" BorderThickness="0" Width="30" Height="30" Cursor="Hand" Click="CloseButton_Click"/>
+                    <Button Content="—" Background="Transparent" Foreground="#94A3B8" FontSize="16" FontWeight="Bold" BorderThickness="0" Width="30" Height="30" Cursor="Hand" Click="CloseButton_Click"/>
+                    <Button Content="✕" Background="Transparent" Foreground="#EF4444" FontSize="16" FontWeight="Bold" BorderThickness="0" Width="30" Height="30" Cursor="Hand" Click="CloseButton_Click"/>
                 </StackPanel>
 
-                <StackPanel x:Name="PageFocusMode" Grid.Row="1" Margin="25,0,25,20" Visibility="Visible">
+                <StackPanel x:Name="PageFocusMode" Grid.Row="1" Margin="20,0,20,15" Visibility="Visible">
                     
                     <Grid Margin="0,0,0,15">
                         <Grid.ColumnDefinitions>
@@ -158,46 +169,53 @@
                         </Grid.ColumnDefinitions>
 
                         <StackPanel Grid.Column="0" Orientation="Horizontal">
-                            <TextBlock Text="Profile Name:" VerticalAlignment="Center" FontSize="13" Foreground="#555" Margin="0,0,8,0"/>
-                            <TextBox x:Name="TxtProfileName" Width="120" Margin="0,0,10,0" Text="Rasel Mia"/>
-                            <Button Content="SAVE" Style="{StaticResource CareBtn}" Background="#10B981" Padding="12,4" FontSize="12" Click="BtnSave_Click"/>
+                            <TextBlock Text="Profile Name:" VerticalAlignment="Center" FontSize="13" FontWeight="SemiBold" Foreground="#475569" Margin="0,0,8,0"/>
+                            <TextBox x:Name="TxtProfileName" Width="130" Margin="0,0,10,0" Text="Rasel Mia"/>
+                            <Button x:Name="BtnSaveProfile" Content="SAVE" Style="{StaticResource CareBtn}" Background="#10B981" Padding="15,4" FontSize="12"/>
                         </StackPanel>
 
-                        <TextBlock Grid.Column="1" Text="TRIAL: 174 DAYS LEFT" Foreground="#F59E0B" FontWeight="Bold" FontSize="13" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        <TextBlock x:Name="LblTrialStatus" Grid.Column="1" Text="TRIAL: 7 DAYS LEFT" Foreground="#F59E0B" FontWeight="Bold" FontSize="14" VerticalAlignment="Center" HorizontalAlignment="Center"/>
 
                         <StackPanel Grid.Column="2" Orientation="Horizontal">
-                            <Button Content="LIVE CHAT" Style="{StaticResource CareBtn}" Background="#EC4899" Margin="0,0,10,0"/>
-                            <Button Content="UPGRADE" Style="{StaticResource CareBtn}" Background="#F59E0B"/>
+                            <Button x:Name="BtnLiveChat" Content="LIVE CHAT" Style="{StaticResource CareBtn}" Background="#EC4899" Margin="0,0,10,0" Padding="12,4" FontSize="12"/>
+                            <Button x:Name="BtnUpgrade" Content="UPGRADE" Style="{StaticResource CareBtn}" Background="#F59E0B" Padding="12,4" FontSize="12"/>
                         </StackPanel>
                     </Grid>
 
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
-                        <TextBlock Text="Pass:" VerticalAlignment="Center" FontSize="13" Foreground="#555" Margin="0,0,5,0"/>
-                        <TextBox x:Name="TxtPass" Width="80" Margin="0,0,15,0"/>
+                    <Border Background="White" CornerRadius="8" Padding="12" Margin="0,0,0,15" BorderBrush="#E2E8F0" BorderThickness="1">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="10" ShadowDepth="2" Opacity="0.05"/>
+                        </Border.Effect>
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                <TextBlock Text="Pass:" VerticalAlignment="Center" FontSize="13" FontWeight="SemiBold" Foreground="#475569" Margin="0,0,5,0"/>
+                                <TextBox x:Name="TxtPass" Width="90" Margin="0,0,15,0"/>
 
-                        <TextBlock Text="Time (Hr:Min):" VerticalAlignment="Center" FontSize="13" Foreground="#555" Margin="0,0,5,0"/>
-                        <TextBox Width="40" Margin="0,0,5,0" Text="0"/>
-                        <TextBox Width="40" Margin="0,0,15,0" Text="0"/>
+                                <TextBlock Text="Time (Hr:Min):" VerticalAlignment="Center" FontSize="13" FontWeight="SemiBold" Foreground="#475569" Margin="0,0,5,0"/>
+                                <TextBox x:Name="TxtTimeHr" Width="40" Margin="0,0,5,0" Text="0"/>
+                                <TextBox x:Name="TxtTimeMin" Width="40" Margin="0,0,15,0" Text="0"/>
 
-                        <Button Content="START" Style="{StaticResource CareBtn}" Background="#10B981" Margin="0,0,8,0" Click="BtnStart_Click"/>
-                        <Button Content="STOP" Style="{StaticResource CareBtn}" Background="#64748B" Margin="0,0,8,0" Click="BtnStop_Click"/>
-                        <Button Content="STOP WATCH" Style="{StaticResource CareBtn}" Background="#0F172A" Margin="0,0,8,0"/>
-                        <Button Content="POMODORO" Style="{StaticResource CareBtn}" Background="#EF4444" Margin="0,0,8,0"/>
-                        <Button Content="EYE CURE" Style="{StaticResource CareBtn}" Background="#8B5CF6" Margin="0,0,15,0"/>
+                                <Button x:Name="BtnStartFocus" Content="START" Style="{StaticResource CareBtn}" Background="#10B981" Margin="0,0,8,0"/>
+                                <Button x:Name="BtnStopFocus" Content="STOP" Style="{StaticResource CareBtn}" Background="#EF4444" Margin="0,0,8,0"/>
+                                <Button x:Name="BtnStopwatch" Content="STOP WATCH" Style="{StaticResource CareBtn}" Background="#1E293B" Margin="0,0,8,0"/>
+                                <Button x:Name="BtnPomodoro" Content="POMODORO" Style="{StaticResource CareBtn}" Background="#F43F5E" Margin="0,0,8,0"/>
+                                <Button x:Name="BtnEyeCure" Content="EYE CURE" Style="{StaticResource CareBtn}" Background="#8B5CF6" Margin="0,0,15,0"/>
 
-                        <TextBlock x:Name="LblStatus" Text="Ready" Foreground="#EF4444" FontWeight="Bold" VerticalAlignment="Center"/>
-                    </StackPanel>
+                                <TextBlock x:Name="LblStatus" Text="Ready" Foreground="#EF4444" FontWeight="Bold" VerticalAlignment="Center"/>
+                            </StackPanel>
 
-                    <WrapPanel Margin="0,0,0,15">
-                        <RadioButton Content="Block List" IsChecked="True" Foreground="#333" FontWeight="Bold" Margin="0,0,15,0" VerticalAlignment="Center"/>
-                        <RadioButton Content="Allow List" Foreground="#333" FontWeight="Bold" Margin="0,0,25,0" VerticalAlignment="Center"/>
-                        
-                        <CheckBox Content="AD BLOCKER" Style="{StaticResource ToggleSwitch}" Margin="0,0,20,0"/>
-                        <CheckBox Content="Block FB Reels" Style="{StaticResource ToggleSwitch}" Margin="0,0,20,0"/>
-                        <CheckBox Content="Block YT Shorts" Style="{StaticResource ToggleSwitch}" Margin="0,0,0,0"/>
-                    </WrapPanel>
+                            <WrapPanel>
+                                <RadioButton x:Name="RadioBlockList" Content="Block List" IsChecked="True" Foreground="#1E293B" FontWeight="Bold" Margin="0,0,20,0" VerticalAlignment="Center"/>
+                                <RadioButton x:Name="RadioAllowList" Content="Allow List (Runs in Pomodoro)" Foreground="#1E293B" FontWeight="Bold" Margin="0,0,30,0" VerticalAlignment="Center"/>
+                                
+                                <CheckBox x:Name="ChkAdBlock" Content="AD BLOCKER" Style="{StaticResource ToggleSwitch}" Margin="0,0,20,0"/>
+                                <CheckBox x:Name="ChkBlockReels" Content="Block FB Reels" Style="{StaticResource ToggleSwitch}" Margin="0,0,20,0"/>
+                                <CheckBox x:Name="ChkBlockShorts" Content="Block YT Shorts" Style="{StaticResource ToggleSwitch}" Margin="0,0,0,0"/>
+                            </WrapPanel>
+                        </StackPanel>
+                    </Border>
 
-                    <Grid Height="390">
+                    <Grid Height="350">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="1*"/>
                             <ColumnDefinition Width="10"/>
@@ -206,91 +224,137 @@
                             <ColumnDefinition Width="1*"/>
                         </Grid.ColumnDefinitions>
 
-                        <Border Grid.Column="0" Background="White" CornerRadius="6" BorderBrush="#E2E8F0" BorderThickness="1" Padding="10">
+                        <Border Grid.Column="0" Background="White" CornerRadius="8" BorderBrush="#E2E8F0" BorderThickness="1" Padding="12">
+                            <Border.Effect><DropShadowEffect BlurRadius="8" ShadowDepth="1" Opacity="0.05"/></Border.Effect>
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="*"/>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="*"/>
-                                    <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
                                 
-                                <TextBlock Grid.Row="0" Text="Block Apps (vlc.exe)" FontSize="12" Foreground="#555" Margin="0,0,0,5"/>
+                                <StackPanel Grid.Row="0">
+                                    <TextBlock Text="Block Apps (e.g., vlc.exe)" FontSize="12" FontWeight="SemiBold" Foreground="#64748B" Margin="0,0,0,5"/>
+                                    <Grid Margin="0,0,0,5">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="70"/>
+                                            <ColumnDefinition Width="50"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="TxtAppBlock" Grid.Column="0" Margin="0,0,5,0"/>
+                                        <ComboBox x:Name="ComboAppBlock" Grid.Column="1" Margin="0,0,5,0"/>
+                                        <Button x:Name="BtnAddAppBlock" Grid.Column="2" Content="ADD" Style="{StaticResource CareBtn}" Background="#3B82F6" Padding="5,2" FontSize="11"/>
+                                    </Grid>
+                                </StackPanel>
                                 <Grid Grid.Row="1" Margin="0,0,0,10">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBox Grid.Column="0" x:Name="TxtAppBlock" Margin="0,0,5,0"/>
-                                    <Button Grid.Column="1" Content="ADD" Style="{StaticResource CareBtn}" Background="#2563EB" Padding="10,2" FontSize="12"/>
-                                    <ListBox Grid.Column="0" Grid.ColumnSpan="2" Margin="0,35,0,0" BorderBrush="#CBD5E1"/>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="*"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+                                    <ListBox x:Name="ListAppBlock" Grid.Row="0" BorderBrush="#CBD5E1" Margin="0,0,0,5"/>
+                                    <Button x:Name="BtnRemAppBlock" Grid.Row="1" Content="Remove" Style="{StaticResource CareBtn}" Background="#64748B" Padding="5,2" FontSize="11"/>
                                 </Grid>
 
-                                <TextBlock Grid.Row="2" Text="Block Websites" FontSize="12" Foreground="#555" Margin="0,0,0,5"/>
-                                <Grid Grid.Row="3" Margin="0,0,0,10">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBox Grid.Column="0" x:Name="TxtWebBlock" Margin="0,0,5,0"/>
-                                    <Button Grid.Column="1" Content="ADD" Style="{StaticResource CareBtn}" Background="#2563EB" Padding="10,2" FontSize="12"/>
-                                    <ListBox Grid.Column="0" Grid.ColumnSpan="2" Margin="0,35,0,0" BorderBrush="#CBD5E1"/>
+                                <StackPanel Grid.Row="2">
+                                    <TextBlock Text="Block Websites" FontSize="12" FontWeight="SemiBold" Foreground="#64748B" Margin="0,0,0,5"/>
+                                    <Grid Margin="0,0,0,5">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="70"/>
+                                            <ColumnDefinition Width="50"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="TxtWebBlock" Grid.Column="0" Margin="0,0,5,0"/>
+                                        <ComboBox x:Name="ComboWebBlock" Grid.Column="1" Margin="0,0,5,0"/>
+                                        <Button x:Name="BtnAddWebBlock" Grid.Column="2" Content="ADD" Style="{StaticResource CareBtn}" Background="#3B82F6" Padding="5,2" FontSize="11"/>
+                                    </Grid>
+                                </StackPanel>
+                                <Grid Grid.Row="3">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="*"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+                                    <ListBox x:Name="ListWebBlock" Grid.Row="0" BorderBrush="#CBD5E1" Margin="0,0,0,5"/>
+                                    <Button x:Name="BtnRemWebBlock" Grid.Row="1" Content="Remove" Style="{StaticResource CareBtn}" Background="#64748B" Padding="5,2" FontSize="11"/>
                                 </Grid>
-
-                                <Button Grid.Row="4" Content="Remove" Style="{StaticResource CareBtn}" Background="#2563EB" Padding="5"/>
                             </Grid>
                         </Border>
 
-                        <Border Grid.Column="2" Background="White" CornerRadius="6" BorderBrush="#E2E8F0" BorderThickness="1" Padding="10">
+                        <Border Grid.Column="2" Background="White" CornerRadius="8" BorderBrush="#E2E8F0" BorderThickness="1" Padding="12">
+                            <Border.Effect><DropShadowEffect BlurRadius="8" ShadowDepth="1" Opacity="0.05"/></Border.Effect>
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="*"/>
                                 </Grid.RowDefinitions>
-                                <TextBlock Grid.Row="0" Text="Running Apps (Auto-Detect)" FontSize="12" Foreground="#555" Margin="0,0,0,5"/>
-                                <Button Grid.Row="1" Content="Add Selected App to List" Style="{StaticResource CareBtn}" Background="#2563EB" Padding="5" Margin="0,0,0,10"/>
+                                <TextBlock Grid.Row="0" Text="Running Apps (Auto-Detect)" FontSize="12" FontWeight="SemiBold" Foreground="#64748B" Margin="0,0,0,5"/>
+                                <Button x:Name="BtnAddFromRunning" Grid.Row="1" Content="Add Selected App to List" Style="{StaticResource CareBtn}" Background="#8B5CF6" Padding="5,6" Margin="0,0,0,8"/>
                                 <ListBox Grid.Row="2" x:Name="ListRunningApps" BorderBrush="#CBD5E1"/>
                             </Grid>
                         </Border>
 
-                        <Border Grid.Column="4" Background="White" CornerRadius="6" BorderBrush="#E2E8F0" BorderThickness="1" Padding="10">
+                        <Border Grid.Column="4" Background="White" CornerRadius="8" BorderBrush="#E2E8F0" BorderThickness="1" Padding="12">
+                            <Border.Effect><DropShadowEffect BlurRadius="8" ShadowDepth="1" Opacity="0.05"/></Border.Effect>
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="*"/>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="*"/>
-                                    <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
                                 
-                                <TextBlock Grid.Row="0" Text="Allow Apps (code.exe)" FontSize="12" Foreground="#555" Margin="0,0,0,5"/>
+                                <StackPanel Grid.Row="0">
+                                    <TextBlock Text="Allow Apps (e.g., code.exe)" FontSize="12" FontWeight="SemiBold" Foreground="#64748B" Margin="0,0,0,5"/>
+                                    <Grid Margin="0,0,0,5">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="70"/>
+                                            <ColumnDefinition Width="50"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="TxtAppAllow" Grid.Column="0" Margin="0,0,5,0"/>
+                                        <ComboBox x:Name="ComboAppAllow" Grid.Column="1" Margin="0,0,5,0"/>
+                                        <Button x:Name="BtnAddAppAllow" Grid.Column="2" Content="ADD" Style="{StaticResource CareBtn}" Background="#10B981" Padding="5,2" FontSize="11"/>
+                                    </Grid>
+                                </StackPanel>
                                 <Grid Grid.Row="1" Margin="0,0,0,10">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBox Grid.Column="0" x:Name="TxtAppAllow" Margin="0,0,5,0"/>
-                                    <Button Grid.Column="1" Content="ADD" Style="{StaticResource CareBtn}" Background="#2563EB" Padding="10,2" FontSize="12"/>
-                                    <ListBox Grid.Column="0" Grid.ColumnSpan="2" Margin="0,35,0,0" BorderBrush="#CBD5E1"/>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="*"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+                                    <ListBox x:Name="ListAppAllow" Grid.Row="0" BorderBrush="#CBD5E1" Margin="0,0,0,5"/>
+                                    <Button x:Name="BtnRemAppAllow" Grid.Row="1" Content="Remove" Style="{StaticResource CareBtn}" Background="#64748B" Padding="5,2" FontSize="11"/>
                                 </Grid>
 
-                                <TextBlock Grid.Row="2" Text="Allow Webs" FontSize="12" Foreground="#555" Margin="0,0,0,5"/>
-                                <Grid Grid.Row="3" Margin="0,0,0,10">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBox Grid.Column="0" x:Name="TxtWebAllow" Margin="0,0,5,0"/>
-                                    <Button Grid.Column="1" Content="ADD" Style="{StaticResource CareBtn}" Background="#2563EB" Padding="10,2" FontSize="12"/>
-                                    <ListBox Grid.Column="0" Grid.ColumnSpan="2" Margin="0,35,0,0" BorderBrush="#CBD5E1"/>
+                                <StackPanel Grid.Row="2">
+                                    <TextBlock Text="Allow Websites" FontSize="12" FontWeight="SemiBold" Foreground="#64748B" Margin="0,0,0,5"/>
+                                    <Grid Margin="0,0,0,5">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="70"/>
+                                            <ColumnDefinition Width="50"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="TxtWebAllow" Grid.Column="0" Margin="0,0,5,0"/>
+                                        <ComboBox x:Name="ComboWebAllow" Grid.Column="1" Margin="0,0,5,0"/>
+                                        <Button x:Name="BtnAddWebAllow" Grid.Column="2" Content="ADD" Style="{StaticResource CareBtn}" Background="#10B981" Padding="5,2" FontSize="11"/>
+                                    </Grid>
+                                </StackPanel>
+                                <Grid Grid.Row="3">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="*"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+                                    <ListBox x:Name="ListWebAllow" Grid.Row="0" BorderBrush="#CBD5E1" Margin="0,0,0,5"/>
+                                    <Button x:Name="BtnRemWebAllow" Grid.Row="1" Content="Remove" Style="{StaticResource CareBtn}" Background="#64748B" Padding="5,2" FontSize="11"/>
                                 </Grid>
-
-                                <Button Grid.Row="4" Content="Remove" Style="{StaticResource CareBtn}" Background="#2563EB" Padding="5"/>
                             </Grid>
                         </Border>
                     </Grid>
+
+                    <Border Background="#F1F5F9" CornerRadius="6" Padding="10" Margin="0,15,0,0">
+                        <TextBlock x:Name="LblAdminMsg" Text="Admin Notice: No new messages." Foreground="#8B5CF6" FontWeight="SemiBold" FontSize="13" TextWrapping="Wrap"/>
+                    </Border>
+                    
                 </StackPanel>
 
                 <StackPanel x:Name="PageEyeCure" Grid.Row="1" Margin="40,20,40,40" Visibility="Collapsed">
