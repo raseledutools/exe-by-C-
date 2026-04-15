@@ -1,34 +1,27 @@
 <Window x:Class="RasFocusPro.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="RasFocus Pro" Height="800" Width="1200"
+        Title="RasFocus Pro" Height="720" Width="1100"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         WindowStartupLocation="CenterScreen" MouseLeftButtonDown="Window_MouseLeftButtonDown"
-        TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType"
-        Icon="icon.ico">
+        TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType">
 
     <Window.Resources>
         <SolidColorBrush x:Key="PrimaryTeal" Color="#14B8C8"/>
         <SolidColorBrush x:Key="DarkText" Color="#333333"/>
         <SolidColorBrush x:Key="LightBg" Color="#FFFFFF"/>
-        <SolidColorBrush x:Key="WarningRed" Color="#EF4444"/>
-        <SolidColorBrush x:Key="SuccessGreen" Color="#10B981"/>
-        <SolidColorBrush x:Key="GoldBtn" Color="#F59E0B"/>
-        <SolidColorBrush x:Key="PinkBtn" Color="#EC4899"/>
-        <SolidColorBrush x:Key="SlateBtn" Color="#64748B"/>
 
         <Style TargetType="TextBox">
             <Setter Property="Background" Value="{StaticResource LightBg}"/>
             <Setter Property="Foreground" Value="{StaticResource DarkText}"/>
             <Setter Property="FontSize" Value="14"/>
-            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="Padding" Value="8,6"/>
             <Setter Property="BorderBrush" Value="#CBD5E1"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TextBox">
-                        <Border CornerRadius="5" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}">
+                        <Border CornerRadius="4" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}">
                             <ScrollViewer x:Name="PART_ContentHost" Margin="0"/>
                         </Border>
                         <ControlTemplate.Triggers>
@@ -47,11 +40,10 @@
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="FontSize" Value="14"/>
             <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Padding" Value="15,8"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="6" Padding="12,6">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                     </ControlTemplate>
@@ -60,10 +52,6 @@
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
                     <Setter Property="Opacity" Value="0.85"/>
-                </Trigger>
-                <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Background" Value="#CBD5E1"/>
-                    <Setter Property="Foreground" Value="#94A3B8"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -74,15 +62,15 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="CheckBox">
                         <StackPanel Orientation="Horizontal">
-                            <Grid Width="40" Height="22">
-                                <Border x:Name="BgBorder" CornerRadius="11" Background="#D1D5DB"/>
-                                <Ellipse x:Name="Thumb" Fill="White" Width="18" Height="18" HorizontalAlignment="Left" Margin="2">
+                            <Grid Width="40" Height="20">
+                                <Border x:Name="BgBorder" CornerRadius="10" Background="#D1D5DB"/>
+                                <Ellipse x:Name="Thumb" Fill="White" Width="16" Height="16" HorizontalAlignment="Left" Margin="2">
                                     <Ellipse.Effect>
                                         <DropShadowEffect BlurRadius="4" ShadowDepth="1" Opacity="0.2"/>
                                     </Ellipse.Effect>
                                 </Ellipse>
                             </Grid>
-                            <ContentPresenter Margin="10,0,0,0" VerticalAlignment="Center" TextBlock.FontSize="14" TextBlock.FontWeight="SemiBold" TextBlock.Foreground="{StaticResource DarkText}"/>
+                            <ContentPresenter Margin="8,0,0,0" VerticalAlignment="Center" TextBlock.FontSize="13" TextBlock.Foreground="{StaticResource DarkText}"/>
                         </StackPanel>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsChecked" Value="True">
@@ -94,17 +82,11 @@
                 </Setter.Value>
             </Setter>
         </Style>
-
-        <Style TargetType="ComboBox">
-            <Setter Property="Padding" Value="8,5"/>
-            <Setter Property="FontSize" Value="13"/>
-        </Style>
-
     </Window.Resources>
 
-    <Border Background="#F8FAFC" CornerRadius="10" Margin="10">
+    <Border Background="#F8FAFC" CornerRadius="10" Margin="15">
         <Border.Effect>
-            <DropShadowEffect BlurRadius="15" ShadowDepth="2" Opacity="0.2" Color="Black"/>
+            <DropShadowEffect BlurRadius="15" ShadowDepth="3" Opacity="0.2" Color="Black"/>
         </Border.Effect>
 
         <Grid>
@@ -115,9 +97,8 @@
 
             <Border Grid.Column="0" Background="{StaticResource PrimaryTeal}" CornerRadius="10,0,0,10">
                 <StackPanel Margin="0,20,0,0">
-                    
                     <StackPanel Orientation="Horizontal" Margin="20,0,0,30">
-                        <Image Source="icon.ico" Width="28" Height="28" Margin="0,0,10,0"/>
+                        <TextBlock Text="👁️" FontSize="24" Foreground="White" Margin="0,0,10,0"/>
                         <TextBlock Text="RasFocus Pro" Foreground="White" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
                     </StackPanel>
 
@@ -147,26 +128,29 @@
                             </Style>
                         </ListBox.ItemContainerStyle>
                         <ListBoxItem IsSelected="True">🛡️  Focus Mode</ListBoxItem>
-                        <ListBoxItem>💻  Eye Cure Display</ListBoxItem>
-                        <ListBoxItem>☕  Pomodoro Setup</ListBoxItem>
+                        <ListBoxItem>💻  Display / Eye Cure</ListBoxItem>
+                        <ListBoxItem>☕  Pomodoro Break</ListBoxItem>
+                        <ListBoxItem>⚙️  Settings</ListBoxItem>
+                        <ListBoxItem>💬  Live Chat</ListBoxItem>
+                        <ListBoxItem>⭐  Activate Pro</ListBoxItem>
                     </ListBox>
                 </StackPanel>
             </Border>
 
             <Grid Grid.Column="1">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="45"/>
+                    <RowDefinition Height="40"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
-                <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="10,10,15,0">
-                    <Button Content="—" Background="Transparent" Foreground="#888" FontSize="18" FontWeight="Bold" BorderThickness="0" Width="30" Height="30" Cursor="Hand" Click="MinimizeButton_Click"/>
-                    <Button Content="✕" Background="Transparent" Foreground="#888" FontSize="18" FontWeight="Bold" BorderThickness="0" Width="30" Height="30" Cursor="Hand" Click="CloseButton_Click" Margin="5,0,0,0"/>
+                <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="10,10,10,0">
+                    <Button Content="—" Background="Transparent" Foreground="#888" FontSize="16" BorderThickness="0" Width="30" Height="30" Cursor="Hand" Click="CloseButton_Click"/>
+                    <Button Content="✕" Background="Transparent" Foreground="#888" FontSize="16" BorderThickness="0" Width="30" Height="30" Cursor="Hand" Click="CloseButton_Click"/>
                 </StackPanel>
 
                 <StackPanel x:Name="PageFocusMode" Grid.Row="1" Margin="25,0,25,20" Visibility="Visible">
                     
-                    <Grid Margin="0,0,0,20">
+                    <Grid Margin="0,0,0,15">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
@@ -174,54 +158,51 @@
                         </Grid.ColumnDefinitions>
 
                         <StackPanel Grid.Column="0" Orientation="Horizontal">
-                            <TextBlock Text="Profile:" VerticalAlignment="Center" FontSize="14" FontWeight="Bold" Foreground="#555" Margin="0,0,8,0"/>
-                            <TextBox x:Name="TxtProfileName" Width="130" Margin="0,0,10,0" Text="Rasel Mia"/>
-                            <Button Content="SAVE" Style="{StaticResource CareBtn}" Background="{StaticResource SuccessGreen}" Padding="15,6" FontSize="12" Click="BtnSave_Click"/>
+                            <TextBlock Text="Profile Name:" VerticalAlignment="Center" FontSize="13" Foreground="#555" Margin="0,0,8,0"/>
+                            <TextBox x:Name="TxtProfileName" Width="120" Margin="0,0,10,0" Text="Rasel Mia"/>
+                            <Button Content="SAVE" Style="{StaticResource CareBtn}" Background="#10B981" Padding="12,4" FontSize="12" Click="BtnSave_Click"/>
                         </StackPanel>
 
-                        <StackPanel Grid.Column="1" HorizontalAlignment="Center">
-                            <TextBlock x:Name="LblTrialStatus" Text="TRIAL: 174 DAYS LEFT" Foreground="{StaticResource GoldBtn}" FontWeight="Bold" FontSize="14" HorizontalAlignment="Center"/>
-                            <TextBlock x:Name="LblAdminMsg" Text="" Foreground="{StaticResource PinkBtn}" FontWeight="SemiBold" FontSize="12" HorizontalAlignment="Center" Margin="0,2,0,0"/>
-                        </StackPanel>
+                        <TextBlock Grid.Column="1" Text="TRIAL: 174 DAYS LEFT" Foreground="#F59E0B" FontWeight="Bold" FontSize="13" VerticalAlignment="Center" HorizontalAlignment="Center"/>
 
                         <StackPanel Grid.Column="2" Orientation="Horizontal">
-                            <Button Content="💬 LIVE CHAT" Style="{StaticResource CareBtn}" Background="{StaticResource PinkBtn}" Margin="0,0,10,0" Click="BtnLiveChat_Click"/>
-                            <Button Content="⭐ UPGRADE" Style="{StaticResource CareBtn}" Background="{StaticResource GoldBtn}" Click="BtnUpgrade_Click"/>
+                            <Button Content="LIVE CHAT" Style="{StaticResource CareBtn}" Background="#EC4899" Margin="0,0,10,0"/>
+                            <Button Content="UPGRADE" Style="{StaticResource CareBtn}" Background="#F59E0B"/>
                         </StackPanel>
                     </Grid>
 
-                    <Border Background="White" CornerRadius="8" BorderBrush="#E2E8F0" BorderThickness="1" Padding="15" Margin="0,0,0,20">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="Lock Pass:" VerticalAlignment="Center" FontSize="14" FontWeight="Bold" Foreground="#555" Margin="0,0,5,0"/>
-                            <TextBox x:Name="TxtPass" Width="90" Margin="0,0,20,0"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
+                        <TextBlock Text="Pass:" VerticalAlignment="Center" FontSize="13" Foreground="#555" Margin="0,0,5,0"/>
+                        <TextBox x:Name="TxtPass" Width="80" Margin="0,0,15,0"/>
 
-                            <TextBlock Text="Timer (Hr:Min):" VerticalAlignment="Center" FontSize="14" FontWeight="Bold" Foreground="#555" Margin="0,0,5,0"/>
-                            <TextBox x:Name="TxtTimeHr" Width="40" Margin="0,0,5,0" Text="0"/>
-                            <TextBox x:Name="TxtTimeMin" Width="40" Margin="0,0,20,0" Text="0"/>
+                        <TextBlock Text="Time (Hr:Min):" VerticalAlignment="Center" FontSize="13" Foreground="#555" Margin="0,0,5,0"/>
+                        <TextBox Width="40" Margin="0,0,5,0" Text="0"/>
+                        <TextBox Width="40" Margin="0,0,15,0" Text="0"/>
 
-                            <Button x:Name="BtnStart" Content="START FOCUS" Style="{StaticResource CareBtn}" Background="{StaticResource SuccessGreen}" Margin="0,0,10,0" Click="BtnStart_Click"/>
-                            <Button x:Name="BtnStopFocus" Content="STOP" Style="{StaticResource CareBtn}" Background="{StaticResource SlateBtn}" Margin="0,0,10,0" Click="BtnStop_Click"/>
-                            <Button Content="⏱ STOP WATCH" Style="{StaticResource CareBtn}" Background="#0F172A" Margin="0,0,10,0" Click="BtnStopWatch_Click"/>
-                            
-                            <TextBlock x:Name="LblStatus" Text="Ready" Foreground="{StaticResource WarningRed}" FontWeight="Bold" FontSize="15" VerticalAlignment="Center" Margin="15,0,0,0"/>
-                        </StackPanel>
-                    </Border>
+                        <Button Content="START" Style="{StaticResource CareBtn}" Background="#10B981" Margin="0,0,8,0" Click="BtnStart_Click"/>
+                        <Button Content="STOP" Style="{StaticResource CareBtn}" Background="#64748B" Margin="0,0,8,0" Click="BtnStop_Click"/>
+                        <Button Content="STOP WATCH" Style="{StaticResource CareBtn}" Background="#0F172A" Margin="0,0,8,0"/>
+                        <Button Content="POMODORO" Style="{StaticResource CareBtn}" Background="#EF4444" Margin="0,0,8,0"/>
+                        <Button Content="EYE CURE" Style="{StaticResource CareBtn}" Background="#8B5CF6" Margin="0,0,15,0"/>
+
+                        <TextBlock x:Name="LblStatus" Text="Ready" Foreground="#EF4444" FontWeight="Bold" VerticalAlignment="Center"/>
+                    </StackPanel>
 
                     <WrapPanel Margin="0,0,0,15">
-                        <RadioButton x:Name="RbBlockList" Content="Use Block List" IsChecked="True" Foreground="#333" FontSize="14" FontWeight="Bold" Margin="0,0,20,0" VerticalAlignment="Center"/>
-                        <RadioButton x:Name="RbAllowList" Content="Use Allow List (Strict Mode)" Foreground="#333" FontSize="14" FontWeight="Bold" Margin="0,0,30,0" VerticalAlignment="Center"/>
+                        <RadioButton Content="Block List" IsChecked="True" Foreground="#333" FontWeight="Bold" Margin="0,0,15,0" VerticalAlignment="Center"/>
+                        <RadioButton Content="Allow List" Foreground="#333" FontWeight="Bold" Margin="0,0,25,0" VerticalAlignment="Center"/>
                         
-                        <CheckBox x:Name="ChkAdBlock" Content="AD BLOCKER" Style="{StaticResource ToggleSwitch}" Margin="0,0,20,0"/>
-                        <CheckBox x:Name="ChkReels" Content="Block FB Reels" Style="{StaticResource ToggleSwitch}" Margin="0,0,20,0"/>
-                        <CheckBox x:Name="ChkShorts" Content="Block YT Shorts" Style="{StaticResource ToggleSwitch}" Margin="0,0,0,0"/>
+                        <CheckBox Content="AD BLOCKER" Style="{StaticResource ToggleSwitch}" Margin="0,0,20,0"/>
+                        <CheckBox Content="Block FB Reels" Style="{StaticResource ToggleSwitch}" Margin="0,0,20,0"/>
+                        <CheckBox Content="Block YT Shorts" Style="{StaticResource ToggleSwitch}" Margin="0,0,0,0"/>
                     </WrapPanel>
 
-                    <Grid Height="400">
+                    <Grid Height="390">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="1*"/>
-                            <ColumnDefinition Width="15"/>
+                            <ColumnDefinition Width="10"/>
                             <ColumnDefinition Width="1*"/>
-                            <ColumnDefinition Width="15"/>
+                            <ColumnDefinition Width="10"/>
                             <ColumnDefinition Width="1*"/>
                         </Grid.ColumnDefinitions>
 
@@ -235,29 +216,29 @@
                                     <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
                                 
-                                <TextBlock Grid.Row="0" Text="Block Apps (vlc.exe)" FontSize="13" FontWeight="Bold" Foreground="#555" Margin="0,0,0,5"/>
+                                <TextBlock Grid.Row="0" Text="Block Apps (vlc.exe)" FontSize="12" Foreground="#555" Margin="0,0,0,5"/>
                                 <Grid Grid.Row="1" Margin="0,0,0,10">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <ComboBox x:Name="ComboAppBlock" Grid.Column="0" Margin="0,0,5,0" IsEditable="True"/>
-                                    <Button Grid.Column="1" Content="ADD" Style="{StaticResource CareBtn}" Background="{StaticResource PrimaryTeal}" Padding="10,2" FontSize="12" Click="BtnAddApp_Click"/>
-                                    <ListBox x:Name="ListBlockedApps" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,35,0,0" BorderBrush="#CBD5E1"/>
+                                    <TextBox Grid.Column="0" x:Name="TxtAppBlock" Margin="0,0,5,0"/>
+                                    <Button Grid.Column="1" Content="ADD" Style="{StaticResource CareBtn}" Background="#2563EB" Padding="10,2" FontSize="12"/>
+                                    <ListBox Grid.Column="0" Grid.ColumnSpan="2" Margin="0,35,0,0" BorderBrush="#CBD5E1"/>
                                 </Grid>
 
-                                <TextBlock Grid.Row="2" Text="Block Websites" FontSize="13" FontWeight="Bold" Foreground="#555" Margin="0,0,0,5"/>
+                                <TextBlock Grid.Row="2" Text="Block Websites" FontSize="12" Foreground="#555" Margin="0,0,0,5"/>
                                 <Grid Grid.Row="3" Margin="0,0,0,10">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <ComboBox x:Name="ComboWebBlock" Grid.Column="0" Margin="0,0,5,0" IsEditable="True"/>
-                                    <Button Grid.Column="1" Content="ADD" Style="{StaticResource CareBtn}" Background="{StaticResource PrimaryTeal}" Padding="10,2" FontSize="12" Click="BtnAddWeb_Click"/>
-                                    <ListBox x:Name="ListBlockedWebs" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,35,0,0" BorderBrush="#CBD5E1"/>
+                                    <TextBox Grid.Column="0" x:Name="TxtWebBlock" Margin="0,0,5,0"/>
+                                    <Button Grid.Column="1" Content="ADD" Style="{StaticResource CareBtn}" Background="#2563EB" Padding="10,2" FontSize="12"/>
+                                    <ListBox Grid.Column="0" Grid.ColumnSpan="2" Margin="0,35,0,0" BorderBrush="#CBD5E1"/>
                                 </Grid>
 
-                                <Button Grid.Row="4" Content="Remove Selected" Style="{StaticResource CareBtn}" Background="{StaticResource WarningRed}" Padding="5" Click="BtnRemApp_Click"/>
+                                <Button Grid.Row="4" Content="Remove" Style="{StaticResource CareBtn}" Background="#2563EB" Padding="5"/>
                             </Grid>
                         </Border>
 
@@ -268,9 +249,9 @@
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="*"/>
                                 </Grid.RowDefinitions>
-                                <TextBlock Grid.Row="0" Text="Running Apps (Auto-Detect)" FontSize="13" FontWeight="Bold" Foreground="#555" Margin="0,0,0,5"/>
-                                <Button Grid.Row="1" Content="Refresh Active List" Style="{StaticResource CareBtn}" Background="{StaticResource SlateBtn}" Padding="5" Margin="0,0,0,10" Click="BtnRefresh_Click"/>
-                                <ListBox x:Name="ListRunningApps" Grid.Row="2" BorderBrush="#CBD5E1"/>
+                                <TextBlock Grid.Row="0" Text="Running Apps (Auto-Detect)" FontSize="12" Foreground="#555" Margin="0,0,0,5"/>
+                                <Button Grid.Row="1" Content="Add Selected App to List" Style="{StaticResource CareBtn}" Background="#2563EB" Padding="5" Margin="0,0,0,10"/>
+                                <ListBox Grid.Row="2" x:Name="ListRunningApps" BorderBrush="#CBD5E1"/>
                             </Grid>
                         </Border>
 
@@ -284,86 +265,40 @@
                                     <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
                                 
-                                <TextBlock Grid.Row="0" Text="Allow Apps (code.exe)" FontSize="13" FontWeight="Bold" Foreground="#555" Margin="0,0,0,5"/>
+                                <TextBlock Grid.Row="0" Text="Allow Apps (code.exe)" FontSize="12" Foreground="#555" Margin="0,0,0,5"/>
                                 <Grid Grid.Row="1" Margin="0,0,0,10">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <ComboBox x:Name="ComboAppAllow" Grid.Column="0" Margin="0,0,5,0" IsEditable="True"/>
-                                    <Button Grid.Column="1" Content="ADD" Style="{StaticResource CareBtn}" Background="{StaticResource SuccessGreen}" Padding="10,2" FontSize="12" Click="BtnAddAllowApp_Click"/>
-                                    <ListBox x:Name="ListAllowApps" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,35,0,0" BorderBrush="#CBD5E1"/>
+                                    <TextBox Grid.Column="0" x:Name="TxtAppAllow" Margin="0,0,5,0"/>
+                                    <Button Grid.Column="1" Content="ADD" Style="{StaticResource CareBtn}" Background="#2563EB" Padding="10,2" FontSize="12"/>
+                                    <ListBox Grid.Column="0" Grid.ColumnSpan="2" Margin="0,35,0,0" BorderBrush="#CBD5E1"/>
                                 </Grid>
 
-                                <TextBlock Grid.Row="2" Text="Allow Websites" FontSize="13" FontWeight="Bold" Foreground="#555" Margin="0,0,0,5"/>
+                                <TextBlock Grid.Row="2" Text="Allow Webs" FontSize="12" Foreground="#555" Margin="0,0,0,5"/>
                                 <Grid Grid.Row="3" Margin="0,0,0,10">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <ComboBox x:Name="ComboWebAllow" Grid.Column="0" Margin="0,0,5,0" IsEditable="True"/>
-                                    <Button Grid.Column="1" Content="ADD" Style="{StaticResource CareBtn}" Background="{StaticResource SuccessGreen}" Padding="10,2" FontSize="12" Click="BtnAddAllowWeb_Click"/>
-                                    <ListBox x:Name="ListAllowWebs" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,35,0,0" BorderBrush="#CBD5E1"/>
+                                    <TextBox Grid.Column="0" x:Name="TxtWebAllow" Margin="0,0,5,0"/>
+                                    <Button Grid.Column="1" Content="ADD" Style="{StaticResource CareBtn}" Background="#2563EB" Padding="10,2" FontSize="12"/>
+                                    <ListBox Grid.Column="0" Grid.ColumnSpan="2" Margin="0,35,0,0" BorderBrush="#CBD5E1"/>
                                 </Grid>
 
-                                <Button Grid.Row="4" Content="Remove Selected" Style="{StaticResource CareBtn}" Background="{StaticResource WarningRed}" Padding="5" Click="BtnRemAllowApp_Click"/>
+                                <Button Grid.Row="4" Content="Remove" Style="{StaticResource CareBtn}" Background="#2563EB" Padding="5"/>
                             </Grid>
                         </Border>
                     </Grid>
                 </StackPanel>
 
                 <StackPanel x:Name="PageEyeCure" Grid.Row="1" Margin="40,20,40,40" Visibility="Collapsed">
-                    <TextBlock Text="Display Settings / Eye Cure" FontSize="24" FontWeight="Bold" Foreground="{StaticResource PrimaryTeal}" Margin="0,0,0,30"/>
-                    
-                    <Grid Margin="0,0,0,30">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="100"/>
-                            <ColumnDefinition Width="400"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Brightness:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                        <Slider x:Name="SliderBrightness" Grid.Column="1" Minimum="10" Maximum="100" Value="100" VerticalAlignment="Center" ValueChanged="SliderBrightness_ValueChanged"/>
-                    </Grid>
-
-                    <Grid Margin="0,0,0,40">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="100"/>
-                            <ColumnDefinition Width="400"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Warmth:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                        <Slider x:Name="SliderWarmth" Grid.Column="1" Minimum="0" Maximum="100" Value="0" VerticalAlignment="Center" ValueChanged="SliderWarmth_ValueChanged"/>
-                    </Grid>
-
-                    <WrapPanel>
-                        <Button Content="☀️ Day Mode" Style="{StaticResource CareBtn}" Background="{StaticResource PrimaryTeal}" Margin="0,0,15,0" Width="130" Click="PresetDay_Click"/>
-                        <Button Content="📖 Reading" Style="{StaticResource CareBtn}" Background="{StaticResource SlateBtn}" Margin="0,0,15,0" Width="130" Click="PresetReading_Click"/>
-                        <Button Content="🌙 Night Time" Style="{StaticResource CareBtn}" Background="#0F172A" Width="130" Click="PresetNight_Click"/>
-                    </WrapPanel>
+                    <TextBlock Text="Display Settings" FontSize="24" FontWeight="Bold" Foreground="{StaticResource PrimaryTeal}"/>
                 </StackPanel>
                 
                 <StackPanel x:Name="PagePomodoro" Grid.Row="1" Margin="40,20,40,40" Visibility="Collapsed">
-                    <TextBlock Text="Pomodoro Technique" FontSize="24" FontWeight="Bold" Foreground="{StaticResource PrimaryTeal}" Margin="0,0,0,30"/>
-                    
-                    <Border Background="White" CornerRadius="8" BorderBrush="#E2E8F0" BorderThickness="1" Padding="30" Width="400" HorizontalAlignment="Left">
-                        <StackPanel>
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
-                                <TextBlock Text="Focus Length (Minutes):" Width="180" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                <TextBox x:Name="TxtPomoMin" Text="25" Width="80"/>
-                            </StackPanel>
-                            
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,30">
-                                <TextBlock Text="Total Sessions:" Width="180" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                <TextBox x:Name="TxtPomoSessions" Text="4" Width="80"/>
-                            </StackPanel>
-                            
-                            <TextBlock x:Name="LblPomoTime" Text="00:00:00" FontSize="40" FontWeight="Bold" Foreground="{StaticResource PrimaryTeal}" HorizontalAlignment="Center" Margin="0,0,0,20"/>
-                            <TextBlock x:Name="LblPomoStatus" Text="Status: Ready" FontSize="14" FontWeight="Bold" Foreground="#555" HorizontalAlignment="Center" Margin="0,0,0,20"/>
-
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                <Button x:Name="BtnPomoStart" Content="START POMODORO" Style="{StaticResource CareBtn}" Background="{StaticResource SuccessGreen}" Margin="0,0,15,0" Click="BtnPomoStart_Click"/>
-                                <Button x:Name="BtnPomoStop" Content="STOP" Style="{StaticResource CareBtn}" Background="{StaticResource WarningRed}" Click="BtnPomoStop_Click"/>
-                            </StackPanel>
-                        </StackPanel>
-                    </Border>
+                    <TextBlock Text="Pomodoro Timer" FontSize="24" FontWeight="Bold" Foreground="{StaticResource PrimaryTeal}"/>
                 </StackPanel>
 
             </Grid>
