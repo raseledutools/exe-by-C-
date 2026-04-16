@@ -90,10 +90,6 @@ namespace RasFocusPro
         private List<string> allowedApps = new List<string>();
         private List<string> allowedWebs = new List<string>();
 
-        // Eye Cure Windows
-        private Window eyeFilterDim = null;
-        private Window eyeFilterWarm = null;
-
         private string[] systemApps = { "explorer.exe", "svchost.exe", "taskmgr.exe", "cmd.exe", "conhost.exe", "csrss.exe", "dwm.exe", "lsass.exe", "services.exe", "smss.exe", "wininit.exe", "winlogon.exe", "spoolsv.exe", "fontdrvhost.exe" };
 
         private List<string> explicitKeywords = new List<string> {
@@ -130,7 +126,7 @@ namespace RasFocusPro
             "\"যারা সময়কে মূল্যায়ন করে না, সময়ও তাদেরকে মূল্যায়ন করে না।\"",
             "\"অতীত চলে গেছে, ভবিষ্যৎ এখনও আসেনি, তোমার কাছে আছে শুধু বর্তমান। তাই এখনই কাজ শুরু করো।\"",
             "\"সময় বিনামূল্যে পাওয়া যায় ঠিকই, কিন্তু এর মূল্য আসলে অমূল্য।\"",
-            "\"তুমি সময়কে ধরে রাখতে পারবেবেক, কিন্তু তুমি একে সঠিকভাবে ব্যবহার করতে পারো।\"",
+            "\"তুমি সময়কে ধরে রাখতে পারবে না, কিন্তু তুমি একে সঠিকভাবে ব্যবহার করতে পারো।\"",
             "\"যে আজ সময় নষ্ট করছে, কাল সময় তাকে নষ্ট করবে।\"",
             "\"সফলতা আর ব্যর্থতার মধ্যে সবচেয়ে বড় পার্থক্য হলো সময়ের সঠিক ব্যবহার।\"",
             "\"তুমি যদি সময়কে হত্যা করো, তবে সময় তোমার স্বপ্নগুলোকে হত্যা করবে।\"",
@@ -157,7 +153,6 @@ namespace RasFocusPro
         private static Mutex _mutex = null;
         #endregion
 
-        #region INITIALIZATION & STARTUP
         public MainWindow()
         {
             // 1. Single Instance Check & Wakeup Broadcast
@@ -166,7 +161,7 @@ namespace RasFocusPro
             if (!createdNew)
             {
                 PostMessage((IntPtr)HWND_BROADCAST, WM_WAKEUP, IntPtr.Zero, IntPtr.Zero);
-                Application.Current.Shutdown();
+                System.Windows.Application.Current.Shutdown();
                 return;
             }
 
@@ -177,26 +172,26 @@ namespace RasFocusPro
             secretDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RasFocusPro");
             Directory.CreateDirectory(secretDir);
 
-            // 2. Setup AutoStart Registry
+            // Setup AutoStart via Registry
             SetupAutoStart(true);
 
-            // 3. Setup Trays & Data
             LoadData();
             RefreshRunningApps();
             SetupTrayIcon();
             PopulateComboBoxes();
-            SetupEyeCureOverlays();
-
-            // 4. Attach Events Dynamically to avoid XAML edits
-            AttachDynamicEvents();
 
             _proc = HookCallback;
             _hookID = SetHook(_proc);
 
-            // 5. Silent Boot Handling (Auto-hide on startup)
-            this.Loaded += Window_Loaded;
+            // Check if started silently via PC Boot
+            string[] args = Environment.GetCommandLineArgs();
+            if (args.Contains("-autostart"))
+            {
+                this.WindowState = WindowState.Minimized;
+                this.Hide();
+            }
 
-            // 6. Timers Initialization
+            // Init Timers
             fastTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
             fastTimer.Tick += FastLoop_Tick;
             fastTimer.Start();
@@ -209,30 +204,19 @@ namespace RasFocusPro
             syncTimer.Tick += SyncLoop_Tick;
             syncTimer.Start();
 
-            // 7. Firebase Setup
+            // Firebase Registration
             _ = RegisterDeviceToFirebase();
 
-            // UI Init Defaults
+            // UI Init
             RadioBlockList.IsChecked = !useAllowMode;
             RadioAllowList.IsChecked = useAllowMode;
-        }
-
-        private void Window_Loaded(object sender, RoutedEventArgs e)
-        {
-            string[] args = Environment.GetCommandLineArgs();
-            if (args.Contains("-autostart"))
-            {
-                this.Hide();
-                this.ShowInTaskbar = false;
-                trayIcon.ShowBalloonTip(2000, "RasFocus Pro", "Started silently in the background.", System.Windows.Forms.ToolTipIcon.Info);
-            }
         }
 
         protected override void OnSourceInitialized(EventArgs e)
         {
             base.OnSourceInitialized(e);
             HwndSource source = PresentationSource.FromVisual(this) as HwndSource;
-            source?.AddHook(WndProc);
+            source.AddHook(WndProc);
         }
 
         private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -248,86 +232,54 @@ namespace RasFocusPro
         protected override void OnClosed(EventArgs e)
         {
             UnhookWindowsHookEx(_hookID);
-            trayIcon?.Dispose();
+            if (trayIcon != null) trayIcon.Dispose();
             base.OnClosed(e);
         }
-        #endregion
 
-        #region EVENT ATTACHMENTS (DYNAMIC)
-        private void AttachDynamicEvents()
-        {
-            // Toggles
-            if (ChkAdBlock != null) { ChkAdBlock.Checked += Toggles_StateChanged; ChkAdBlock.Unchecked += Toggles_StateChanged; }
-            if (ChkBlockReels != null) { ChkBlockReels.Checked += Toggles_StateChanged; ChkBlockReels.Unchecked += Toggles_StateChanged; }
-            if (ChkBlockShorts != null) { ChkBlockShorts.Checked += Toggles_StateChanged; ChkBlockShorts.Unchecked += Toggles_StateChanged; }
-
-            // Radio Buttons
-            if (RadioBlockList != null) RadioBlockList.Checked += RadioList_Checked;
-            if (RadioAllowList != null) RadioAllowList.Checked += RadioList_Checked;
-
-            // Eye Cure Sliders
-            var sliderBright = this.FindName("SliderBrightness") as Slider;
-            if (sliderBright != null) sliderBright.ValueChanged += SliderBrightness_ValueChanged;
-
-            var sliderWarm = this.FindName("SliderWarmth") as Slider;
-            if (sliderWarm != null) sliderWarm.ValueChanged += SliderWarmth_ValueChanged;
-        }
-
-        private void Toggles_StateChanged(object sender, RoutedEventArgs e)
-        {
-            blockReels = ChkBlockReels?.IsChecked == true;
-            blockShorts = ChkBlockShorts?.IsChecked == true;
-            
-            bool currentAdblock = ChkAdBlock?.IsChecked == true;
-            if (isAdblockActive != currentAdblock)
-            {
-                isAdblockActive = currentAdblock;
-                ToggleAdBlockRegistry(isAdblockActive); // Silently insert Extension via Registry
-            }
-            SyncTogglesToFirebase();
-        }
-        #endregion
-
-        #region REGISTRY & ADBLOCKER FORCING
+        #region REGISTRY & SYSTEM MANIPULATION (AutoStart & Adblocker)
         private void SetupAutoStart(bool enable)
         {
             try
             {
-                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", true))
+                using (RegistryKey key = Registry.CurrentUser.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", true))
                 {
                     string appPath = "\"" + System.Reflection.Assembly.GetExecutingAssembly().Location + "\" -autostart";
-                    if (enable) key.SetValue("RasFocusPro", appPath);
-                    else key.DeleteValue("RasFocusPro", false);
+                    if (enable)
+                        key.SetValue("RasFocusPro", appPath);
+                    else
+                        key.DeleteValue("RasFocusPro", false);
                 }
             }
-            catch { /* Ignore if unauthorized */ }
+            catch { }
         }
 
         private void ToggleAdBlockRegistry(bool enable)
         {
             try
             {
-                // Chrome Extension Force Install
+                // Silently Force Install uBlock Origin via Registry (Chrome)
                 using (RegistryKey key = Registry.CurrentUser.CreateSubKey(@"SOFTWARE\Policies\Google\Chrome\ExtensionInstallForcelist"))
                 {
                     if (enable) key.SetValue("1", "cjpalhdlnbpafiamejdnhcphjbkeiagm;https://clients2.google.com/service/update2/crx");
                     else key.DeleteValue("1", false);
                 }
-                // Edge Extension Force Install
+                // (Edge)
                 using (RegistryKey key = Registry.CurrentUser.CreateSubKey(@"SOFTWARE\Policies\Microsoft\Edge\ExtensionInstallForcelist"))
                 {
                     if (enable) key.SetValue("1", "odfafepnkmbhccpbejgmiehpchacaeak;https://edge.microsoft.com/extensionwebstorebase/v1/crx");
                     else key.DeleteValue("1", false);
                 }
             }
-            catch { /* Needs Admin rights sometimes, ignore failure */ }
+            catch { }
         }
         #endregion
 
-        #region FIREBASE SYNC (HTTP API)
+        #region FIREBASE HTTP CONTROLLER
         private string GetDeviceID()
         {
-            return $"{Environment.MachineName}-{Environment.UserName}".Replace(" ", "_");
+            string machine = Environment.MachineName;
+            string user = Environment.UserName;
+            return $"{machine}-{user}".Replace(" ", "_");
         }
 
         private async Task RegisterDeviceToFirebase()
@@ -342,7 +294,8 @@ namespace RasFocusPro
                         ""profileName"": {{ ""stringValue"": ""{userProfileName}"" }}
                     }}
                 }}";
-                await httpClient.PatchAsync(url, new StringContent(jsonBody, Encoding.UTF8, "application/json"));
+                var content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
+                await httpClient.PatchAsync(url, content);
             }
             catch { }
         }
@@ -381,16 +334,16 @@ namespace RasFocusPro
         {
             trayIcon = new System.Windows.Forms.NotifyIcon();
             string iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "icon.ico");
-            if (File.Exists(iconPath)) trayIcon.Icon = new System.Drawing.Icon(iconPath);
-            else trayIcon.Icon = System.Drawing.SystemIcons.Shield;
+            if (File.Exists(iconPath)) { trayIcon.Icon = new System.Drawing.Icon(iconPath); }
+            else { trayIcon.Icon = System.Drawing.SystemIcons.Shield; }
 
-            trayIcon.Text = "RasFocus Pro - Background Manager";
+            trayIcon.Text = "RasFocus Pro - Focus Manager";
             trayIcon.Visible = true;
             trayIcon.DoubleClick += (s, e) => ShowAppFromTray();
 
-            var menu = new System.Windows.Forms.ContextMenuStrip();
-            menu.Items.Add("Open Control Panel", null, (s, e) => ShowAppFromTray());
-            menu.Items.Add("Exit Focus Manager", null, (s, e) => 
+            System.Windows.Forms.ContextMenuStrip menu = new System.Windows.Forms.ContextMenuStrip();
+            menu.Items.Add("Open RasFocus", null, (s, e) => ShowAppFromTray());
+            menu.Items.Add("Exit App", null, (s, e) => 
             {
                 if (isSessionActive)
                 {
@@ -399,7 +352,7 @@ namespace RasFocusPro
                 else
                 {
                     trayIcon.Dispose();
-                    Application.Current.Shutdown();
+                    System.Windows.Application.Current.Shutdown();
                 }
             });
             trayIcon.ContextMenuStrip = menu;
@@ -409,7 +362,6 @@ namespace RasFocusPro
         {
             this.Show();
             this.WindowState = WindowState.Normal;
-            this.ShowInTaskbar = true;
             this.Activate(); 
             this.Topmost = true; 
             this.Topmost = false; 
@@ -417,30 +369,27 @@ namespace RasFocusPro
         }
         #endregion
 
-        #region UI POPULATION & BUTTON EVENTS
+        #region UI EVENT HANDLERS & POPULATION
         private void PopulateComboBoxes()
         {
-            string[] popSites = { "Select..", "facebook.com", "youtube.com", "instagram.com", "tiktok.com", "reddit.com", "netflix.com" };
-            string[] popApps = { "Select..", "chrome.exe", "msedge.exe", "vlc.exe", "telegram.exe", "code.exe", "discord.exe" };
+            string[] popSites = { "Select..", "facebook.com", "youtube.com", "instagram.com", "tiktok.com", "reddit.com" };
+            string[] popApps = { "Select..", "chrome.exe", "msedge.exe", "vlc.exe", "telegram.exe", "code.exe" };
 
-            var comboWBlock = this.FindName("ComboWebBlock") as ComboBox;
-            var comboWAllow = this.FindName("ComboWebAllow") as ComboBox;
-            var comboABlock = this.FindName("ComboAppBlock") as ComboBox;
-            var comboAAllow = this.FindName("ComboAppAllow") as ComboBox;
+            foreach (var site in popSites) { ComboWebBlock.Items.Add(site); ComboWebAllow.Items.Add(site); }
+            foreach (var app in popApps) { ComboAppBlock.Items.Add(app); ComboAppAllow.Items.Add(app); }
 
-            if (comboWBlock != null) foreach (var s in popSites) { comboWBlock.Items.Add(s); comboWAllow.Items.Add(s); }
-            if (comboABlock != null) foreach (var a in popApps) { comboABlock.Items.Add(a); comboAAllow.Items.Add(a); }
-
-            if(comboWBlock != null) comboWBlock.SelectedIndex = 0;
-            if(comboWAllow != null) comboWAllow.SelectedIndex = 0;
-            if(comboABlock != null) comboABlock.SelectedIndex = 0;
-            if(comboAAllow != null) comboAAllow.SelectedIndex = 0;
+            ComboWebBlock.SelectedIndex = 0; ComboWebAllow.SelectedIndex = 0;
+            ComboAppBlock.SelectedIndex = 0; ComboAppAllow.SelectedIndex = 0;
+            
+            ChkBlockReels.IsChecked = blockReels;
+            ChkBlockShorts.IsChecked = blockShorts;
+            ChkAdBlock.IsChecked = isAdblockActive;
         }
 
         private void RadioList_Checked(object sender, RoutedEventArgs e)
         {
             if (isSessionActive) return;
-            useAllowMode = (RadioAllowList?.IsChecked == true);
+            useAllowMode = (RadioAllowList.IsChecked == true);
             SaveData();
         }
 
@@ -449,79 +398,75 @@ namespace RasFocusPro
         private void CloseButton_Click(object sender, RoutedEventArgs e) 
         { 
             this.Hide(); 
-            this.ShowInTaskbar = false;
             trayIcon.ShowBalloonTip(2000, "RasFocus Pro", "Running securely in the background...", System.Windows.Forms.ToolTipIcon.Info);
         }
 
-        // === Navigation Shortcut Clicks ===
-        private void BtnNavLiveChat_Click(object sender, RoutedEventArgs e) { if (SidebarList != null) SidebarList.SelectedIndex = 4; }
-        private void BtnNavUpgrade_Click(object sender, RoutedEventArgs e) { if (SidebarList != null) SidebarList.SelectedIndex = 5; }
-        private void BtnNavPomodoro_Click(object sender, RoutedEventArgs e) { if (SidebarList != null) SidebarList.SelectedIndex = 2; }
-        private void BtnNavEyeCure_Click(object sender, RoutedEventArgs e) { if (SidebarList != null) SidebarList.SelectedIndex = 1; }
+        // ============= NAVIGATION BUTTONS =============
+        private void BtnNavLiveChat_Click(object sender, RoutedEventArgs e) { SidebarList.SelectedIndex = 4; }
+        private void BtnNavUpgrade_Click(object sender, RoutedEventArgs e) { SidebarList.SelectedIndex = 5; }
+        private void BtnNavPomodoro_Click(object sender, RoutedEventArgs e) { SidebarList.SelectedIndex = 2; }
+        private void BtnNavEyeCure_Click(object sender, RoutedEventArgs e) { SidebarList.SelectedIndex = 1; }
 
         private void SidebarList_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            var pageFocus = this.FindName("PageFocusMode") as UIElement;
-            var pageEyeCure = this.FindName("PageEyeCure") as UIElement;
-            var pagePomodoro = this.FindName("PagePomodoro") as UIElement;
-            var pageSettings = this.FindName("PageSettings") as UIElement;
-            var pageLiveChat = this.FindName("PageLiveChat") as UIElement;
-            var pageActivatePro = this.FindName("PageActivatePro") as UIElement;
-
-            if (pageFocus == null || SidebarList == null) return;
-
-            int i = SidebarList.SelectedIndex;
-            if (pageFocus != null) pageFocus.Visibility = i == 0 ? Visibility.Visible : Visibility.Collapsed;
-            if (pageEyeCure != null) pageEyeCure.Visibility = i == 1 ? Visibility.Visible : Visibility.Collapsed;
-            if (pagePomodoro != null) pagePomodoro.Visibility = i == 2 ? Visibility.Visible : Visibility.Collapsed;
-            if (pageSettings != null) pageSettings.Visibility = i == 3 ? Visibility.Visible : Visibility.Collapsed;
-            if (pageLiveChat != null) pageLiveChat.Visibility = i == 4 ? Visibility.Visible : Visibility.Collapsed;
-            if (pageActivatePro != null) pageActivatePro.Visibility = i == 5 ? Visibility.Visible : Visibility.Collapsed;
+            if (PageFocusMode == null) return;
+            int index = SidebarList.SelectedIndex;
+            PageFocusMode.Visibility = index == 0 ? Visibility.Visible : Visibility.Collapsed;
+            PageEyeCure.Visibility = index == 1 ? Visibility.Visible : Visibility.Collapsed;
+            PagePomodoro.Visibility = index == 2 ? Visibility.Visible : Visibility.Collapsed;
+            // PageSettings, PageLiveChat, PageActivatePro visibility logic will go here if added to XAML
         }
 
         private void BtnSave_Click(object sender, RoutedEventArgs e)
         {
-            var txtProf = this.FindName("TxtProfileName") as TextBox;
-            if (txtProf != null)
+            userProfileName = TxtProfileName.Text;
+            SyncProfileNameToFirebase(userProfileName);
+            System.Windows.MessageBox.Show("Profile Name Saved Successfully to Cloud!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        // Fast Action Checkboxes
+        private void FastToggles_Click(object sender, RoutedEventArgs e)
+        {
+            blockReels = ChkBlockReels.IsChecked == true;
+            blockShorts = ChkBlockShorts.IsChecked == true;
+            if (isAdblockActive != (ChkAdBlock.IsChecked == true))
             {
-                userProfileName = txtProf.Text;
-                SyncProfileNameToFirebase(userProfileName);
-                System.Windows.MessageBox.Show("Profile Name Saved & Synced Successfully!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                isAdblockActive = ChkAdBlock.IsChecked == true;
+                ToggleAdBlockRegistry(isAdblockActive); // Apply to Registry silently
             }
+            SyncTogglesToFirebase();
         }
         #endregion
 
-        #region FOCUS MODE & POMODORO LOGIC
+        #region FOCUS & POMODORO START/STOP
         private void BtnStart_Click(object sender, RoutedEventArgs e)
         {
             if (isSessionActive) return;
             
-            var txtHr = this.FindName("TxtTimeHr") as TextBox;
-            var txtMin = this.FindName("TxtTimeMin") as TextBox;
-            var txtPass = this.FindName("TxtPass") as TextBox;
-
             int hr = 0, min = 0;
-            if (txtHr != null) int.TryParse(txtHr.Text, out hr);
-            if (txtMin != null) int.TryParse(txtMin.Text, out min);
+            int.TryParse(TxtTimeHr.Text, out hr);
+            int.TryParse(TxtTimeMin.Text, out min);
             
             focusTimeTotalSeconds = (hr * 3600) + (min * 60);
-            currentSessionPass = txtPass != null ? txtPass.Text : "";
+            currentSessionPass = TxtPass.Text;
 
             if (focusTimeTotalSeconds > 0 || !string.IsNullOrEmpty(currentSessionPass))
             {
                 isPassMode = !string.IsNullOrEmpty(currentSessionPass);
                 isTimeMode = focusTimeTotalSeconds > 0;
-                useAllowMode = (RadioAllowList?.IsChecked == true);
+                useAllowMode = (RadioAllowList.IsChecked == true);
+                blockReels = (ChkBlockReels.IsChecked == true);
+                blockShorts = (ChkBlockShorts.IsChecked == true);
                 
                 isSessionActive = true;
                 timerTicks = 0;
                 
                 SaveData();
                 UpdateUIStates();
+                FastToggles_Click(null, null); // Sync toggles
                 
-                System.Windows.MessageBox.Show("Focus Mode Active. Distractions are now blocked.", "Security", MessageBoxButton.OK, MessageBoxImage.Information);
+                System.Windows.MessageBox.Show("Focus Mode Active. Unauthorized apps and websites are now blocked.", "Security", MessageBoxButton.OK, MessageBoxImage.Information);
                 this.Hide(); 
-                this.ShowInTaskbar = false;
             }
             else
             {
@@ -533,11 +478,9 @@ namespace RasFocusPro
         {
             if (!isSessionActive) return;
 
-            var txtPass = this.FindName("TxtPass") as TextBox;
-
             if (isPassMode)
             {
-                if (txtPass != null && txtPass.Text != currentSessionPass)
+                if (TxtPass.Text != currentSessionPass)
                 {
                     System.Windows.MessageBox.Show("Wrong password!", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                     return;
@@ -557,25 +500,16 @@ namespace RasFocusPro
         {
             if (!isSessionActive)
             {
-                var txtPomoMin = this.FindName("TxtPomoMin") as TextBox;
-                var txtPomoSessions = this.FindName("TxtPomoSessions") as TextBox;
-
-                if (txtPomoMin != null) int.TryParse(txtPomoMin.Text, out pomoLengthMin);
-                if (txtPomoSessions != null) int.TryParse(txtPomoSessions.Text, out pomoTotalSessions);
-
-                if(pomoLengthMin <= 0) pomoLengthMin = 25;
-                if(pomoTotalSessions <= 0) pomoTotalSessions = 4;
-
                 isPomodoroMode = true;
                 isSessionActive = true;
                 pomoTicks = 0;
                 pomoCurrentSession = 1;
-                useAllowMode = true; 
-                if (RadioAllowList != null) RadioAllowList.IsChecked = true;
+                useAllowMode = true; // Pomodoro always runs on Allow List
+                RadioAllowList.IsChecked = true;
                 
                 SaveData();
                 UpdateUIStates();
-                System.Windows.MessageBox.Show("Pomodoro Started! Only Allow List apps & websites can be accessed now.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                System.Windows.MessageBox.Show("Pomodoro Started! Only Allow List is active.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
 
@@ -585,7 +519,7 @@ namespace RasFocusPro
             {
                 ClearSessionData();
                 UpdateUIStates();
-                System.Windows.MessageBox.Show("Pomodoro Stopped manually.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                System.Windows.MessageBox.Show("Pomodoro Stopped.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
 
@@ -598,53 +532,53 @@ namespace RasFocusPro
             currentSessionPass = "";
             focusTimeTotalSeconds = 0;
             timerTicks = 0;
-            
-            var txtPass = this.FindName("TxtPass") as TextBox;
-            if (txtPass != null) txtPass.Clear();
-            
+            TxtPass.Clear();
             UpdateUIStates();
         }
 
         private void UpdateUIStates()
         {
             trayIcon.Text = isSessionActive ? "RasFocus Pro (ACTIVE 🔒)" : "RasFocus Pro (Ready)";
+            LblStatus.Text = isSessionActive ? "Focus Active!" : "Ready";
+            LblStatus.Foreground = isSessionActive ? new SolidColorBrush(Colors.Green) : new SolidColorBrush(Colors.Red);
             
-            var lblStatus = this.FindName("LblStatus") as TextBlock;
-            if(lblStatus != null)
-            {
-                lblStatus.Text = isSessionActive ? "Focus Active!" : "Ready";
-                lblStatus.Foreground = isSessionActive ? new SolidColorBrush(Colors.Green) : new SolidColorBrush(Colors.Red);
-            }
+            RadioBlockList.IsEnabled = !isSessionActive;
+            RadioAllowList.IsEnabled = !isSessionActive;
+            BtnStartFocus.IsEnabled = !isSessionActive;
+            BtnStopFocus.IsEnabled = isSessionActive;
             
-            if (RadioBlockList != null) RadioBlockList.IsEnabled = !isSessionActive;
-            if (RadioAllowList != null) RadioAllowList.IsEnabled = !isSessionActive;
-            
-            var btnStart = this.FindName("BtnStartFocus") as Button;
-            var btnStop = this.FindName("BtnStopFocus") as Button;
-            if (btnStart != null) btnStart.IsEnabled = !isSessionActive;
-            if (btnStop != null) btnStop.IsEnabled = isSessionActive;
-            
-            // Disable Inputs while active
-            var inputs = new[] { "TxtAppBlock", "TxtWebBlock", "TxtAppAllow", "TxtWebAllow", "BtnAddAppBlock", "BtnAddWebBlock", "BtnAddAppAllow", "BtnAddWebAllow", "BtnRemAppBlock", "BtnRemWebBlock", "BtnRemAppAllow", "BtnRemWebAllow" };
-            foreach (var name in inputs)
-            {
-                var el = this.FindName(name) as UIElement;
-                if (el != null) el.IsEnabled = !isSessionActive;
-            }
+            TxtAppBlock.IsEnabled = !isSessionActive;
+            TxtWebBlock.IsEnabled = !isSessionActive;
+            TxtAppAllow.IsEnabled = !isSessionActive;
+            TxtWebAllow.IsEnabled = !isSessionActive;
+            BtnAddAppBlock.IsEnabled = !isSessionActive;
+            BtnAddWebBlock.IsEnabled = !isSessionActive;
+            BtnAddAppAllow.IsEnabled = !isSessionActive;
+            BtnAddWebAllow.IsEnabled = !isSessionActive;
+            BtnRemAppBlock.IsEnabled = !isSessionActive;
+            BtnRemWebBlock.IsEnabled = !isSessionActive;
+            BtnRemAppAllow.IsEnabled = !isSessionActive;
+            BtnRemWebAllow.IsEnabled = !isSessionActive;
         }
         #endregion
 
-        #region BACKGROUND TIMERS (FAST, SLOW, SYNC)
-        private string SafeGetUrl(IntPtr hwnd)
+        #region BACKGROUND LOGIC (URL READER & TIMERS)
+        private string GetActiveTabUrl(IntPtr hwnd)
         {
             try
             {
                 AutomationElement elm = AutomationElement.FromHandle(hwnd);
-                var elmUrlBar = elm.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Edit));
+                AutomationElement elmUrlBar = elm.FindFirst(TreeScope.Descendants,
+                    new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Edit));
+
                 if (elmUrlBar != null)
                 {
-                    var pattern = elmUrlBar.GetCurrentPattern(ValuePattern.Pattern) as ValuePattern;
-                    return pattern?.Current.Value.ToLower() ?? "";
+                    AutomationPattern[] patterns = elmUrlBar.GetSupportedPatterns();
+                    if (patterns.Length > 0)
+                    {
+                        ValuePattern val = (ValuePattern)elmUrlBar.GetCurrentPattern(ValuePattern.Pattern);
+                        return val.Current.Value.ToLower();
+                    }
                 }
             }
             catch { }
@@ -653,68 +587,93 @@ namespace RasFocusPro
 
         private void FastLoop_Tick(object sender, EventArgs e)
         {
-            try
+            if (!blockAdult && !blockReels && !blockShorts && !isSessionActive) return;
+            if (overlayWindow != null && overlayWindow.IsVisible) return;
+
+            IntPtr hWnd = GetForegroundWindow();
+            if (hWnd != IntPtr.Zero)
             {
-                if (!blockAdult && !blockReels && !blockShorts && !isSessionActive) return;
-                if (overlayWindow != null && overlayWindow.IsVisible) return;
+                StringBuilder title = new StringBuilder(512);
+                GetWindowText(hWnd, title, 512);
+                string sTitle = title.ToString().ToLower();
 
-                IntPtr hWnd = GetForegroundWindow();
-                if (hWnd == IntPtr.Zero) return;
+                bool isBrowser = sTitle.Contains("chrome") || sTitle.Contains("edge") || 
+                                 sTitle.Contains("firefox") || sTitle.Contains("brave") || 
+                                 sTitle.Contains("opera");
 
-                StringBuilder titleBuilder = new StringBuilder(512);
-                GetWindowText(hWnd, titleBuilder, 512);
-                string title = titleBuilder.ToString().ToLower();
-
-                bool isBrowser = title.Contains("chrome") || title.Contains("edge") || title.Contains("firefox") || title.Contains("brave") || title.Contains("opera");
-                string activeUrl = isBrowser ? SafeGetUrl(hWnd) : "";
-
-                // 1. Adult Filter
-                if (blockAdult)
+                string activeUrl = "";
+                if (isBrowser)
                 {
-                    bool isAdult = explicitKeywords.Any(k => title.Contains(k)) || (isBrowser && adultDomains.Any(d => activeUrl.Contains(d)));
-                    if (isAdult) { BlockActiveTab(hWnd, GetRandomQuote(1)); return; }
+                    activeUrl = GetActiveTabUrl(hWnd); 
                 }
 
-                // 2. Social Media Blockers
-                if (blockReels && isBrowser && (activeUrl.Contains("facebook.com/reel") || title.Contains("reels")))
-                { BlockActiveTab(hWnd, GetRandomQuote(2)); return; }
-                
-                if (blockShorts && isBrowser && (activeUrl.Contains("youtube.com/shorts") || title.Contains("shorts")))
-                { BlockActiveTab(hWnd, GetRandomQuote(2)); return; }
+                // 1. Explicit Keywords Block & Adult Domain Block
+                if (blockAdult)
+                {
+                    bool isAdultMatch = explicitKeywords.Any(k => sTitle.Contains(k));
+                    if (!isAdultMatch && isBrowser && !string.IsNullOrEmpty(activeUrl))
+                    {
+                        isAdultMatch = adultDomains.Any(d => activeUrl.Contains(d));
+                    }
 
-                // 3. Focus Mode Custom Lists
+                    if (isAdultMatch)
+                    {
+                        CloseWindowNatively(hWnd);
+                        ShowOverlay(GetRandomQuote(1));
+                        return;
+                    }
+                }
+
+                // 2. Facebook Reels Block (URL check included)
+                if (blockReels && isBrowser)
+                {
+                    if (activeUrl.Contains("facebook.com/reel") || (sTitle.Contains("facebook") && sTitle.Contains("reel")))
+                    {
+                        CloseWindowNatively(hWnd);
+                        ShowOverlay(GetRandomQuote(2));
+                        return;
+                    }
+                }
+
+                // 3. YouTube Shorts Block (URL check included)
+                if (blockShorts && isBrowser)
+                {
+                    if (activeUrl.Contains("youtube.com/shorts") || (sTitle.Contains("youtube") && sTitle.Contains("shorts")))
+                    {
+                        CloseWindowNatively(hWnd);
+                        ShowOverlay(GetRandomQuote(2));
+                        return;
+                    }
+                }
+
+                // 4. Focus Mode Custom Website Logic
                 if (isSessionActive && isBrowser)
                 {
                     if (useAllowMode)
                     {
-                        if (!allowedWebs.Any(w => title.Contains(w.ToLower()) || activeUrl.Contains(w.ToLower())) && !title.Contains("new tab") && !title.Contains("start"))
-                            BlockActiveTab(hWnd, "Website is not in your Allow List!");
+                        if (!allowedWebs.Any(w => sTitle.Contains(w.ToLower()) || activeUrl.Contains(w.ToLower())) && !sTitle.Contains("allowed websites"))
+                        {
+                            CloseWindowNatively(hWnd);
+                            ShowOverlay("Website not in Allow List!");
+                        }
                     }
                     else
                     {
-                        if (blockedWebs.Any(w => title.Contains(w.ToLower()) || activeUrl.Contains(w.ToLower())))
-                            BlockActiveTab(hWnd, "Website Blocked by Focus Mode!");
+                        if (blockedWebs.Any(w => sTitle.Contains(w.ToLower()) || activeUrl.Contains(w.ToLower())))
+                        {
+                            CloseWindowNatively(hWnd);
+                            ShowOverlay("Website Blocked by Focus Mode!");
+                        }
                     }
                 }
             }
-            catch { /* Silent Catch */ }
-        }
-
-        private void BlockActiveTab(IntPtr hWnd, string reason)
-        {
-            SetForegroundWindow(hWnd);
-            keybd_event(VK_CONTROL, 0, 0, UIntPtr.Zero);
-            keybd_event(0x57, 0, 0, UIntPtr.Zero); // W
-            keybd_event(0x57, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
-            keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
-            ShowWindow(hWnd, SW_MINIMIZE);
-            ShowOverlay(reason);
         }
 
         private void SlowLoop_Tick(object sender, EventArgs e)
         {
             if (!isSessionActive) return;
 
+            // Native Process Killer (The Enforcer)
             foreach (Process p in Process.GetProcesses())
             {
                 try
@@ -722,19 +681,22 @@ namespace RasFocusPro
                     string pName = p.ProcessName.ToLower() + ".exe";
                     if (pName == "taskmgr.exe" || pName == "msiexec.exe") { p.Kill(); continue; } 
 
-                    if (useAllowMode) { if (!systemApps.Contains(pName) && !allowedApps.Contains(pName)) p.Kill(); }
-                    else { if (blockedApps.Contains(pName)) p.Kill(); }
+                    if (useAllowMode)
+                    {
+                        if (!systemApps.Contains(pName) && !allowedApps.Contains(pName)) p.Kill();
+                    }
+                    else
+                    {
+                        if (blockedApps.Contains(pName)) p.Kill();
+                    }
                 }
-                catch { }
+                catch { /* Ignore access denied */ }
             }
         }
 
         private void SyncLoop_Tick(object sender, EventArgs e)
         {
             if (!isSessionActive) return;
-            var lblStatus = this.FindName("LblStatus") as TextBlock;
-            var lblBigTime = this.FindName("LblPomoBigTime") as TextBlock;
-            var lblBigStatus = this.FindName("LblPomoBigStatus") as TextBlock;
 
             if (isTimeMode && focusTimeTotalSeconds > 0)
             {
@@ -743,12 +705,6 @@ namespace RasFocusPro
                 {
                     ClearSessionData();
                     System.Windows.MessageBox.Show("Focus time is over!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
-                }
-                else
-                {
-                    int left = focusTimeTotalSeconds - timerTicks;
-                    TimeSpan t = TimeSpan.FromSeconds(left);
-                    Dispatcher.Invoke(() => { if(lblStatus != null) lblStatus.Text = string.Format("Time: {0:D2}:{1:D2}:{2:D2}", t.Hours, t.Minutes, t.Seconds); });
                 }
             }
             
@@ -760,19 +716,16 @@ namespace RasFocusPro
                 if (left < 0) left = 0;
 
                 TimeSpan t = TimeSpan.FromSeconds(left);
-                string timeStr = string.Format("{0:D2}:{1:D2}", t.Minutes, t.Seconds);
-                
+                // Ensure Label update works on UI Thread safely
                 Dispatcher.Invoke(() => { 
-                    if(lblStatus != null) lblStatus.Text = "Pomo: " + timeStr; 
-                    if(lblBigTime != null) lblBigTime.Text = timeStr;
-                    if(lblBigStatus != null) lblBigStatus.Text = isPomodoroBreak ? $"Break Time | Session {pomoCurrentSession} of {pomoTotalSessions}" : $"Focus Time | Session {pomoCurrentSession} of {pomoTotalSessions}";
+                    LblStatus.Text = string.Format("Pomo: {0:D2}:{1:D2}", t.Minutes, t.Seconds); 
                 });
 
                 if (!isPomodoroBreak && pomoTicks >= pomoLengthMin * 60)
                 {
                     isPomodoroBreak = true;
                     pomoTicks = 0;
-                    ShowOverlay("☕ Time to Rest & Drink Water! 5 Minute Break Started.");
+                    ShowOverlay("☕ Time to Rest & Drink Water! Break Started.");
                 }
                 else if (isPomodoroBreak && pomoTicks >= 5 * 60)
                 {
@@ -782,13 +735,18 @@ namespace RasFocusPro
                     if (pomoCurrentSession > pomoTotalSessions)
                     {
                         ClearSessionData();
-                        System.Windows.MessageBox.Show("All Pomodoro Sessions Completed! Great work.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
-                    }
-                    else
-                    {
-                        ShowOverlay($"🚀 Break Over! Starting Session {pomoCurrentSession}. Get back to work!");
+                        System.Windows.MessageBox.Show("All Pomodoro Sessions Completed!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
                     }
                 }
+            }
+            else if (isTimeMode)
+            {
+                int left = focusTimeTotalSeconds - timerTicks;
+                if (left < 0) left = 0;
+                TimeSpan t = TimeSpan.FromSeconds(left);
+                Dispatcher.Invoke(() => { 
+                    LblStatus.Text = string.Format("Time: {0:D2}:{1:D2}:{2:D2}", t.Hours, t.Minutes, t.Seconds); 
+                });
             }
         }
         #endregion
@@ -796,8 +754,7 @@ namespace RasFocusPro
         #region LIST MANAGEMENT (ADD/REMOVE)
         private void AddToList(TextBox input, ListBox list, List<string> dataList, string fileName)
         {
-            if (input == null || list == null) return;
-            string val = input.Text.Trim().ToLower();
+            string val = input.Text.Trim();
             if (!string.IsNullOrEmpty(val) && !dataList.Contains(val))
             {
                 dataList.Add(val);
@@ -809,94 +766,72 @@ namespace RasFocusPro
 
         private void RemoveFromList(ListBox list, List<string> dataList, string fileName)
         {
-            if (list == null || list.SelectedIndex == -1) return;
-            string val = list.SelectedItem.ToString();
-            dataList.Remove(val);
-            list.Items.RemoveAt(list.SelectedIndex);
-            SaveListToFile(dataList, fileName);
+            if (list.SelectedIndex != -1)
+            {
+                string val = list.SelectedItem.ToString();
+                dataList.Remove(val);
+                list.Items.RemoveAt(list.SelectedIndex);
+                SaveListToFile(dataList, fileName);
+            }
         }
 
-        private void BtnAddAppBlock_Click(object sender, RoutedEventArgs e) => AddToList(this.FindName("TxtAppBlock") as TextBox, this.FindName("ListAppBlock") as ListBox, blockedApps, "bl_app.txt");
-        private void BtnAddWebBlock_Click(object sender, RoutedEventArgs e) => AddToList(this.FindName("TxtWebBlock") as TextBox, this.FindName("ListWebBlock") as ListBox, blockedWebs, "bl_web.txt");
-        private void BtnAddAppAllow_Click(object sender, RoutedEventArgs e) => AddToList(this.FindName("TxtAppAllow") as TextBox, this.FindName("ListAppAllow") as ListBox, allowedApps, "al_app.txt");
-        private void BtnAddWebAllow_Click(object sender, RoutedEventArgs e) => AddToList(this.FindName("TxtWebAllow") as TextBox, this.FindName("ListWebAllow") as ListBox, allowedWebs, "al_web.txt");
+        private void BtnAddAppBlock_Click(object sender, RoutedEventArgs e) => AddToList(TxtAppBlock, ListAppBlock, blockedApps, "bl_app.txt");
+        private void BtnAddWebBlock_Click(object sender, RoutedEventArgs e) => AddToList(TxtWebBlock, ListWebBlock, blockedWebs, "bl_web.txt");
+        private void BtnAddAppAllow_Click(object sender, RoutedEventArgs e) => AddToList(TxtAppAllow, ListAppAllow, allowedApps, "al_app.txt");
+        private void BtnAddWebAllow_Click(object sender, RoutedEventArgs e) => AddToList(TxtWebAllow, ListWebAllow, allowedWebs, "al_web.txt");
 
-        private void BtnRemAppBlock_Click(object sender, RoutedEventArgs e) => RemoveFromList(this.FindName("ListAppBlock") as ListBox, blockedApps, "bl_app.txt");
-        private void BtnRemWebBlock_Click(object sender, RoutedEventArgs e) => RemoveFromList(this.FindName("ListWebBlock") as ListBox, blockedWebs, "bl_web.txt");
-        private void BtnRemAppAllow_Click(object sender, RoutedEventArgs e) => RemoveFromList(this.FindName("ListAppAllow") as ListBox, allowedApps, "al_app.txt");
-        private void BtnRemWebAllow_Click(object sender, RoutedEventArgs e) => RemoveFromList(this.FindName("ListWebAllow") as ListBox, allowedWebs, "al_web.txt");
+        private void BtnRemAppBlock_Click(object sender, RoutedEventArgs e) => RemoveFromList(ListAppBlock, blockedApps, "bl_app.txt");
+        private void BtnRemWebBlock_Click(object sender, RoutedEventArgs e) => RemoveFromList(ListWebBlock, blockedWebs, "bl_web.txt");
+        private void BtnRemAppAllow_Click(object sender, RoutedEventArgs e) => RemoveFromList(ListAppAllow, allowedApps, "al_app.txt");
+        private void BtnRemWebAllow_Click(object sender, RoutedEventArgs e) => RemoveFromList(ListWebAllow, allowedWebs, "al_web.txt");
 
         private void RefreshRunningApps()
         {
-            var list = this.FindName("ListRunningApps") as ListBox;
-            if (list == null) return;
-
-            list.Items.Clear();
+            ListRunningApps.Items.Clear();
             var processes = Process.GetProcesses().Select(p => p.ProcessName.ToLower() + ".exe").Distinct().OrderBy(p => p);
             foreach (var p in processes)
             {
                 if (p != "svchost.exe" && p != "explorer.exe") 
-                    list.Items.Add(p);
+                    ListRunningApps.Items.Add(p);
             }
         }
 
         private void BtnAddFromRunning_Click(object sender, RoutedEventArgs e)
         {
-            var listRun = this.FindName("ListRunningApps") as ListBox;
-            var txtB = this.FindName("TxtAppBlock") as TextBox;
-            var txtA = this.FindName("TxtAppAllow") as TextBox;
-
-            if (listRun != null && listRun.SelectedIndex != -1)
+            if (ListRunningApps.SelectedIndex != -1)
             {
-                string selectedApp = listRun.SelectedItem.ToString();
-                if (RadioBlockList != null && RadioBlockList.IsChecked == true)
+                string selectedApp = ListRunningApps.SelectedItem.ToString();
+                if (RadioBlockList.IsChecked == true)
                 {
-                    if (txtB != null) txtB.Text = selectedApp;
+                    TxtAppBlock.Text = selectedApp;
                     BtnAddAppBlock_Click(null, null);
                 }
                 else
                 {
-                    if (txtA != null) txtA.Text = selectedApp;
+                    TxtAppAllow.Text = selectedApp;
                     BtnAddAppAllow_Click(null, null);
                 }
             }
         }
         #endregion
 
-        #region EYE CURE & OVERLAYS
-        private void SetupEyeCureOverlays()
-        {
-            eyeFilterDim = new Window { WindowStyle = WindowStyle.None, AllowsTransparency = true, Background = Brushes.Black, Topmost = true, ShowInTaskbar = false, IsHitTestVisible = false, WindowState = WindowState.Maximized, Opacity = 0 };
-            eyeFilterWarm = new Window { WindowStyle = WindowStyle.None, AllowsTransparency = true, Background = Brushes.DarkOrange, Topmost = true, ShowInTaskbar = false, IsHitTestVisible = false, WindowState = WindowState.Maximized, Opacity = 0 };
-            eyeFilterDim.Show(); 
-            eyeFilterWarm.Show();
-        }
-
-        private void SliderBrightness_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            if (eyeFilterDim != null)
-            {
-                double val = e.NewValue; // 10 to 100
-                double opacity = (100 - val) / 100.0; // 100 = 0% opaque, 10 = 90% opaque
-                eyeFilterDim.Opacity = opacity * 0.85; // Max 85% darkness
-            }
-        }
-
-        private void SliderWarmth_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            if (eyeFilterWarm != null)
-            {
-                double val = e.NewValue; // 0 to 100
-                eyeFilterWarm.Opacity = (val / 100.0) * 0.4; // Max 40% warmth
-            }
-        }
-        #endregion
-
-        #region HELPER UTILITIES
+        #region UTILITIES & NATIVE HELPERS
         private string GetRandomQuote(int type)
         {
             Random r = new Random();
-            return type == 1 ? islamicQuotes[r.Next(islamicQuotes.Length)] : timeQuotes[r.Next(timeQuotes.Length)];
+            if (type == 1) return islamicQuotes[r.Next(islamicQuotes.Length)];
+            else return timeQuotes[r.Next(timeQuotes.Length)];
+        }
+
+        private void CloseWindowNatively(IntPtr hWnd)
+        {
+            SetForegroundWindow(hWnd);
+            keybd_event(VK_CONTROL, 0, 0, UIntPtr.Zero);
+            keybd_event((byte)'W', 0, 0, UIntPtr.Zero);
+            keybd_event((byte)'W', 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+            keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+            Thread.Sleep(50);
+            ShowWindow(hWnd, SW_MINIMIZE);
         }
 
         private void ShowOverlay(string message)
@@ -908,8 +843,7 @@ namespace RasFocusPro
                     WindowStyle = WindowStyle.None, AllowsTransparency = true,
                     Background = new SolidColorBrush(Color.FromArgb(240, 9, 61, 31)),
                     Topmost = true, Width = 800, Height = 300,
-                    WindowStartupLocation = WindowStartupLocation.CenterScreen,
-                    ShowInTaskbar = false
+                    WindowStartupLocation = WindowStartupLocation.CenterScreen
                 };
                 TextBlock tb = new TextBlock
                 {
@@ -933,7 +867,7 @@ namespace RasFocusPro
         }
         #endregion
 
-        #region KEYBOARD HOOK (TYPING BLOCKER)
+        #region REAL-TIME KEYBOARD HOOK (TYPING BLOCKER)
         private static IntPtr SetHook(LowLevelKeyboardProc proc)
         {
             using (Process curProcess = Process.GetCurrentProcess())
@@ -960,14 +894,8 @@ namespace RasFocusPro
                         {
                             globalKeyBuffer = ""; 
                             IntPtr hActive = GetForegroundWindow();
-                            if (hActive != IntPtr.Zero) 
-                            {
-                                SetForegroundWindow(hActive);
-                                keybd_event(VK_CONTROL, 0, 0, UIntPtr.Zero);
-                                keybd_event(0x57, 0, 0, UIntPtr.Zero);
-                                keybd_event(0x57, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
-                                keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
-                            }
+                            if (hActive != IntPtr.Zero) _instance.CloseWindowNatively(hActive);
+                            
                             _instance.ShowOverlay(_instance.GetRandomQuote(1));
                             break;
                         }
@@ -994,24 +922,20 @@ namespace RasFocusPro
 
         private void LoadData()
         {
-            LoadListFromFile(ref blockedApps, "ListAppBlock", "bl_app.txt");
-            LoadListFromFile(ref blockedWebs, "ListWebBlock", "bl_web.txt");
-            LoadListFromFile(ref allowedApps, "ListAppAllow", "al_app.txt");
-            LoadListFromFile(ref allowedWebs, "ListWebAllow", "al_web.txt");
+            LoadListFromFile(ref blockedApps, ListAppBlock, "bl_app.txt");
+            LoadListFromFile(ref blockedWebs, ListWebBlock, "bl_web.txt");
+            LoadListFromFile(ref allowedApps, ListAppAllow, "al_app.txt");
+            LoadListFromFile(ref allowedWebs, ListWebAllow, "al_web.txt");
         }
 
-        private void LoadListFromFile(ref List<string> dataList, string uiListName, string filename)
+        private void LoadListFromFile(ref List<string> dataList, ListBox uiList, string filename)
         {
             string path = Path.Combine(secretDir, filename);
-            var uiList = this.FindName(uiListName) as ListBox;
             if (File.Exists(path))
             {
                 dataList = File.ReadAllLines(path).ToList();
-                if (uiList != null)
-                {
-                    uiList.Items.Clear();
-                    foreach (var item in dataList) uiList.Items.Add(item);
-                }
+                uiList.Items.Clear();
+                foreach (var item in dataList) uiList.Items.Add(item);
             }
         }
         #endregion
