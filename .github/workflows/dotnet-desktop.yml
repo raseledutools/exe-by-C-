@@ -1,13 +1,33 @@
-- name: Setup MSVC (C++ Compiler)
-      uses: ilammy/msvc-dev-cmd@v1
+name: Build RasFocus Pro (C# WPF)
 
-    - name: Compile C++ DLL
-      run: |
-        cl.exe /LD /MD /O2 /EHsc RasFocusCore.cpp /link /OUT:RasFocusCore.dll User32.lib Advapi32.lib
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
 
-    - name: Build WPF Project
-      run: dotnet build -c Release
+jobs:
+  build:
+    runs-on: windows-latest
 
-    - name: Bundle DLL
-      run: |
-        copy RasFocusCore.dll bin\Release\net8.0-windows\ /Y
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Publish Single EXE (Tiny Size)
+      # --self-contained false করা হয়েছে অ্যাপের সাইজ ২-৩ এমবি করার জন্য
+      run: dotnet publish -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o ./publish_output
+
+    - name: Upload EXE Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: RasFocusPro-Standalone
+        path: ./publish_output/RasFocusPro.exe
