@@ -400,14 +400,14 @@ namespace RasFocusPro
         
         private void CloseButton_Click(object sender, RoutedEventArgs e) 
         { 
-            // Hide এর বদলে পুরোপুরি বন্ধ করার লজিক দেওয়া হলো 
-            UnhookWindowsHookEx(_hookID);
+            // Hide করে Tray তে পাঠানোর লজিক অ্যাড করা হলো 
+            this.Hide(); 
+            this.ShowInTaskbar = false;
             if (trayIcon != null)
             {
-                trayIcon.Visible = false;
-                trayIcon.Dispose();
+                trayIcon.Visible = true;
+                trayIcon.ShowBalloonTip(2000, "RasFocus Pro", "Running securely in the background...", System.Windows.Forms.ToolTipIcon.Info);
             }
-            Application.Current.Shutdown();
         }
 
         // === Navigation Shortcut Clicks ===
