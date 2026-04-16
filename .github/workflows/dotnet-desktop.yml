@@ -1,13 +1,35 @@
-- name: Setup MSVC (C++ Compiler)
+name: Build RasFocus Pro (Hybrid)
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x' 
+
+    - name: Setup MSVC (C++ Compiler)
       uses: ilammy/msvc-dev-cmd@v1
 
-    - name: Compile C++ DLL
+    - name: Compile C++ Core to DLL
       run: |
         cl.exe /LD /MD /O2 /EHsc RasFocusCore.cpp /link /OUT:RasFocusCore.dll User32.lib Advapi32.lib
 
-    - name: Build WPF Project
+    - name: Build WPF C# Project
       run: dotnet build -c Release
 
-    - name: Bundle DLL
+    - name: Copy DLL to Output Directory
+      shell: cmd
       run: |
         copy RasFocusCore.dll bin\Release\net8.0-windows\ /Y
