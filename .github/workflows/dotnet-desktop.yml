@@ -1,50 +1,13 @@
-name: Build RasFocus Pro (Hybrid)
-
-on:
-  push:
-    branches: [ "main", "master" ]
-  pull_request:
-    branches: [ "main", "master" ]
-
-jobs:
-  build:
-    runs-on: windows-latest
-
-    steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
-
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '8.0.x' 
-
-    - name: Setup MSVC (C++ Compiler)
+- name: Setup MSVC (C++ Compiler)
       uses: ilammy/msvc-dev-cmd@v1
 
-    - name: Compile C++ Core to DLL
+    - name: Compile C++ DLL
       run: |
         cl.exe /LD /MD /O2 /EHsc RasFocusCore.cpp /link /OUT:RasFocusCore.dll User32.lib Advapi32.lib
 
-    - name: Build WPF C# Project
+    - name: Build WPF Project
       run: dotnet build -c Release
 
-    - name: Locate and Copy DLL
-      shell: pwsh
+    - name: Bundle DLL
       run: |
-        # আউটপুট ফোল্ডারটি খুঁজে বের করা এবং DLL কপি করা
-        $destPath = Get-ChildItem -Path bin -Recurse -Directory | Where-Object { $_.FullName -match "Release" -and $_.FullName -match "net" } | Select-Object -First 1 -ExpandProperty FullName
-        
-        if ($destPath) {
-            Write-Host "Target Directory Found: $destPath"
-            Copy-Item "RasFocusCore.dll" -Destination "$destPath\" -Force
-        } else {
-            Write-Error "Could not find the build output directory."
-            exit 1
-        }
-
-    - name: Upload Artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: RasFocusPro-Hybrid-Release
-        path: bin/**/Release/
+        copy RasFocusCore.dll bin\Release\net8.0-windows\ /Y
