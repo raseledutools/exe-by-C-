@@ -119,7 +119,7 @@ namespace RasFocusPro
             "\"যে ব্যক্তি হারাম দৃষ্টি থেকে নিজের চোখকে ফিরিয়ে নেয়, সৃষ্টিকর্তা তার অন্তরে ঈমানের এক অপূর্ব স্বাদ ঢেলে দেন।\"",
             "\"ক্ষণিকের হারাম আনন্দ দীর্ঘস্থায়ী অনুশোচনার কারণ হয়, তাই নফস থেকে নিজেকে বাঁচিয়ে রাখো।\"",
             "\"সবচেয়ে বড় যুদ্ধ হলো নিজের খারাপ প্রবৃত্তির বিরুদ্ধে লড়াই করা।\"",
-            "\"নির্জনে করা পাপও গোপন থাকে চিহ্নিত থাকে না, কারণ উপরওয়ালা সব দেখেন এবং সব জানেন।\"",
+            "\"নির্জনে করা পাপও গোপন থাকে না, কারণ উপরওয়ালা সব দেখেন এবং সব জানেন।\"",
             "\"যে ব্যক্তি নির্জনে পাপ থেকে বিরত থাকে, তাকে প্রকাশ্যে সম্মানিত করা হয়।\"",
             "\"নিশ্চয়ই সৃষ্টিকর্তা তওবাকারীদের ভালোবাসেন এবং যারা পবিত্র থাকে তাদেরও ভালোবাসেন।\"",
             "\"অন্তর যখন কলুষিত হয়, তখন মানুষের দৃষ্টিও তার পবিত্রতা হারিয়ে ফেলে।\"",
@@ -161,8 +161,9 @@ namespace RasFocusPro
         public MainWindow()
         {
             // 1. Single Instance Check & Wakeup Broadcast
+            // Mutex এর নাম পরিবর্তন করে RasFocusPro_Mutex_Final করা হয়েছে যাতে আগের প্রসেস বাধা না দেয়
             bool createdNew;
-            _mutex = new Mutex(true, "RasFocusPro_Mutex_V55", out createdNew);
+            _mutex = new Mutex(true, "RasFocusPro_Mutex_Final", out createdNew);
             if (!createdNew)
             {
                 PostMessage((IntPtr)HWND_BROADCAST, WM_WAKEUP, IntPtr.Zero, IntPtr.Zero);
@@ -400,7 +401,7 @@ namespace RasFocusPro
         
         private void CloseButton_Click(object sender, RoutedEventArgs e) 
         { 
-            // Hide করে Tray তে পাঠানোর লজিক অ্যাড করা হলো 
+            // Hide করে Tray তে পাঠানোর লজিক 
             this.Hide(); 
             this.ShowInTaskbar = false;
             if (trayIcon != null)
