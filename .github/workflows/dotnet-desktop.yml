@@ -29,7 +29,22 @@ jobs:
     - name: Build WPF C# Project
       run: dotnet build -c Release
 
-    - name: Copy DLL to Output Directory
-      shell: cmd
+    - name: Locate and Copy DLL
+      shell: pwsh
       run: |
-        copy RasFocusCore.dll bin\Release\net8.0-windows\ /Y
+        # আউটপুট ফোল্ডারটি খুঁজে বের করা এবং DLL কপি করা
+        $destPath = Get-ChildItem -Path bin -Recurse -Directory | Where-Object { $_.FullName -match "Release" -and $_.FullName -match "net" } | Select-Object -First 1 -ExpandProperty FullName
+        
+        if ($destPath) {
+            Write-Host "Target Directory Found: $destPath"
+            Copy-Item "RasFocusCore.dll" -Destination "$destPath\" -Force
+        } else {
+            Write-Error "Could not find the build output directory."
+            exit 1
+        }
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: RasFocusPro-Hybrid-Release
+        path: bin/**/Release/
