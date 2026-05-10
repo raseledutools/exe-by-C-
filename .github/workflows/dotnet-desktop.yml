@@ -1,4 +1,4 @@
-name: Build RasFocus Pro (C# WPF)
+name: Build RasPdf Pro (C# WPF)
 
 on:
   push:
@@ -23,11 +23,12 @@ jobs:
       run: dotnet restore
 
     - name: Publish Single EXE (Tiny Size)
-      # --self-contained false করা হয়েছে অ্যাপের সাইজ ২-৩ এমবি করার জন্য
+      # --self-contained false করা হয়েছে অ্যাপের সাইজ ২-৩ এমবি করার জন্য
       run: dotnet publish -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o ./publish_output
 
     - name: Upload EXE Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: RasFocusPro-Standalone
-        path: ./publish_output/RasFocusPro.exe
+        name: RasPdfPro-Standalone
+        # .exe ফাইলের নাম যাই হোক না কেন, *.exe দেওয়ার কারণে এটি অটোমেটিক আপলোড হয়ে যাবে
+        path: ./publish_output/*.exe
