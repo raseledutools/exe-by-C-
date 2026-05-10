@@ -132,7 +132,7 @@ namespace EnterprisePdfEditor.Core.Rendering
             int widthPx  = (int)Math.Ceiling(pageSize.Width  * renderDpi / PdfBaseDpi);
             int heightPx = (int)Math.Ceiling(pageSize.Height * renderDpi / PdfBaseDpi);
 
-            using Bitmap bmp = _pdfiumDoc.Render(pageIndex, widthPx, heightPx,
+            using Bitmap bmp = (Bitmap)_pdfiumDoc.Render(pageIndex, widthPx, heightPx,
                                                   (float)renderDpi, (float)renderDpi,
                                                   PdfRenderFlags.Annotations |
                                                   PdfRenderFlags.CorrectFromDpi);
