@@ -3,12 +3,11 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
-    <!-- Apryse সাধারণত 64-bit এ সেরা পারফর্ম করে -->
     <Platforms>x64</Platforms> 
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- এটিই সেই ম্যাজিক ইঞ্জিন যা ইনলাইন এডিট করতে দেয় -->
-    <PackageReference Include="PDFTron.NET.x64" Version="10.9.0" />
+    <!-- গিটহাব অ্যাকশনস এর জন্য পারফেক্ট এন্টারপ্রাইজ ইঞ্জিন -->
+    <PackageReference Include="Syncfusion.PdfViewer.WPF" Version="25.2.3" />
   </ItemGroup>
 </Project>
