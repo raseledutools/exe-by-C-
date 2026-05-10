@@ -17,13 +17,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Media;
+using ITextColor = iText.Kernel.Colors.Color;
+using ITextDeviceGray = iText.Kernel.Colors.DeviceGray;
 using EnterprisePdfEditor.Core.Models;
 using iText.Kernel.Pdf;
 using iText.Kernel.Pdf.Canvas.Parser;
 using iText.Kernel.Pdf.Canvas.Parser.Data;
 using iText.Kernel.Pdf.Canvas.Parser.Listener;
 using iText.Kernel.Font;
-using iText.Kernel.Colors;
 using iText.Kernel.Geom;
 
 namespace EnterprisePdfEditor.Core.Engine
@@ -434,12 +435,12 @@ namespace EnterprisePdfEditor.Core.Engine
         {
             try
             {
-                iText.Kernel.Colors.Color? iColor = tri.GetFillColor();
+                ITextColor? iColor = tri.GetFillColor();
                 if (iColor is null) return Colors.Black;
 
                 float[] comps = iColor.GetColorValue();
 
-                if (iColor is DeviceGray && comps.Length >= 1)
+                if (iColor is ITextDeviceGray && comps.Length >= 1)
                 {
                     byte v = (byte)(comps[0] * 255);
                     return Color.FromRgb(v, v, v);
