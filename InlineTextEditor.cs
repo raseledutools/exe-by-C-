@@ -21,6 +21,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using EnterprisePdfEditor.Core.Engine;
 using EnterprisePdfEditor.Core.Models;
+using EnterprisePdfEditor.Core.Rendering;
 
 namespace EnterprisePdfEditor.UI.Controls
 {
