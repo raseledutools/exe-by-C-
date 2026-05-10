@@ -51,6 +51,9 @@ namespace EnterprisePdfEditor.Core.Models
         /// <summary>Word spacing (Tw) from the text state (applied to ASCII 0x20).</summary>
         public double WordSpacing { get; init; }
 
+        /// <summary>Fill color of this glyph (from graphics state at render time).</summary>
+        public Color FillColor { get; init; } = Colors.Black;
+
         // ---- Derived convenience helpers ------------------------------------
 
         public double Right => X + Width;
