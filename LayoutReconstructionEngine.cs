@@ -17,8 +17,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Media;
-using ITextColor = iText.Kernel.Colors.Color;
-using ITextDeviceGray = iText.Kernel.Colors.DeviceGray;
 using EnterprisePdfEditor.Core.Models;
 using iText.Kernel.Pdf;
 using iText.Kernel.Pdf.Canvas.Parser;
@@ -26,6 +24,9 @@ using iText.Kernel.Pdf.Canvas.Parser.Data;
 using iText.Kernel.Pdf.Canvas.Parser.Listener;
 using iText.Kernel.Font;
 using iText.Kernel.Geom;
+using ITextColor = iText.Kernel.Colors.Color;
+using ITextDeviceGray = iText.Kernel.Colors.DeviceGray;
+using ITextVector = iText.Kernel.Geom.Vector;
 
 namespace EnterprisePdfEditor.Core.Engine
 {
@@ -338,12 +339,12 @@ namespace EnterprisePdfEditor.Core.Engine
                 var startPt  = charInfo.GetBaseline().GetStartPoint();
                 var endPt    = charInfo.GetBaseline().GetEndPoint();
 
-                double x     = startPt.Get(Vector.I1);
+                double x     = startPt.Get(ITextVector.I1);
                 // PDF Y=0 is at page bottom. We keep PDF space here;
                 // conversion to screen space is done in the view layer.
-                double y     = startPt.Get(Vector.I2);
+                double y     = startPt.Get(ITextVector.I2);
 
-                double advW  = endPt.Get(Vector.I1) - x;
+                double advW  = endPt.Get(ITextVector.I1) - x;
                 // For negative advances (RTL) take absolute value.
                 if (advW < 0) advW = -advW;
 
