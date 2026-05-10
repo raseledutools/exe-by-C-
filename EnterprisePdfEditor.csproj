@@ -8,7 +8,6 @@
     <UseWPF>true</UseWPF>
     <AssemblyName>EnterprisePdfEditor</AssemblyName>
     <RootNamespace>EnterprisePdfEditor</RootNamespace>
-    <ApplicationIcon>Resources\app.ico</ApplicationIcon>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Platforms>x64</Platforms>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
@@ -18,15 +17,12 @@
     <!-- iText7: ISO 32000 content stream manipulation -->
     <PackageReference Include="itext7" Version="8.0.4" />
     <PackageReference Include="itext7.bouncy-castle-adapter" Version="8.0.4" />
-
     <!-- PDFium for high-fidelity rendering -->
     <PackageReference Include="PdfiumViewer" Version="2.13.0" />
     <PackageReference Include="PdfiumViewer.Native.x86_64.v8-xfa" Version="2018.4.8.256" />
-
     <!-- WPF UI & utilities -->
     <PackageReference Include="Microsoft.Xaml.Behaviors.Wpf" Version="1.1.77" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
-
     <!-- Interop / Drawing -->
     <PackageReference Include="System.Drawing.Common" Version="8.0.0" />
   </ItemGroup>
