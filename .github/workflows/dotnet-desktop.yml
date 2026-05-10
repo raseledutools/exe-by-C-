@@ -1,4 +1,4 @@
-name: Build RasPdf Pro (C# WPF)
+name: Build EnterprisePdfEditor (WPF .NET 8)
 
 on:
   push:
@@ -8,27 +8,30 @@ on:
 
 jobs:
   build:
+    name: Build Single File Windows Executable
     runs-on: windows-latest
 
     steps:
     - name: Checkout Code
       uses: actions/checkout@v4
 
-    - name: Setup .NET
+    - name: Setup .NET 8.0
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '8.0.x'
 
     - name: Restore dependencies
-      run: dotnet restore
+      run: dotnet restore EnterprisePdfEditor.csproj
 
-    - name: Publish Single EXE (Tiny Size)
-      # --self-contained false করা হয়েছে অ্যাপের সাইজ ২-৩ এমবি করার জন্য
-      run: dotnet publish -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o ./publish_output
+    - name: Build Project
+      run: dotnet build EnterprisePdfEditor.csproj -c Release --no-restore
 
-    - name: Upload EXE Artifact
+    - name: Publish Single File Application
+      # এখানে -p:PublishSingleFile=true যুক্ত করা হয়েছে যেন একটিমাত্র .exe তৈরি হয়
+      run: dotnet publish EnterprisePdfEditor.csproj -c Release -r win-x64 -p:PublishSingleFile=true --self-contained false -o ./publish
+
+    - name: Upload Build Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: RasPdfPro-Standalone
-        # .exe ফাইলের নাম যাই হোক না কেন, *.exe দেওয়ার কারণে এটি অটোমেটিক আপলোড হয়ে যাবে
-        path: ./publish_output/*.exe
+        name: EnterprisePdfEditor-Windows-x64-SingleExe
+        path: ./publish
