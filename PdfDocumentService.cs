@@ -102,7 +102,7 @@ namespace EnterprisePdfEditor.Core.Services
 
             // Convert BoundingBox (PDF space) → iText Rect (PDF space, 1-based page).
             var bbox = paragraph.BoundingBox;
-            var iRect = new iText.Kernel.Geom.Rect(
+            var iRect = new iText.Kernel.Geom.Rectangle(
                 (float)bbox.X, (float)bbox.Y,
                 (float)bbox.Width, (float)bbox.Height);
 
