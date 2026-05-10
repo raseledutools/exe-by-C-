@@ -46,7 +46,7 @@ namespace EnterprisePdfEditor.Core.Engine
         // while the WPF inline editor overlay is displayed.
         // Call this BEFORE showing the overlay RTB.
         // ------------------------------------------------------------------
-        public void RedactOriginalText(int pageIndex, Rect pdfBBox)
+        public void RedactOriginalText(int pageIndex, iText.Kernel.Geom.Rectangle pdfBBox)
         {
             PdfPage  page   = _pdfDoc.GetPage(pageIndex + 1); // iText is 1-based
             PdfCanvas canvas = new(page);
