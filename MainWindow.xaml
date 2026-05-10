@@ -1,0 +1,509 @@
+<Window x:Class="EnterprisePdfEditor.UI.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:EnterprisePdfEditor.UI"
+        mc:Ignorable="d"
+        Title="Enterprise PDF Editor — Acrobat-Level Text Editing"
+        Height="900" Width="1400"
+        WindowStartupLocation="CenterScreen"
+        Background="#1E1E2E">
+
+    <Window.Resources>
+        <!-- ================================================================
+             Color palette (VS Code Dark+ inspired)
+             ================================================================ -->
+        <SolidColorBrush x:Key="AccentBrush"      Color="#0078D4"/>
+        <SolidColorBrush x:Key="SurfaceBrush"     Color="#252537"/>
+        <SolidColorBrush x:Key="SidebarBrush"     Color="#1C1C2E"/>
+        <SolidColorBrush x:Key="ToolbarBrush"     Color="#2D2D3F"/>
+        <SolidColorBrush x:Key="TextBrush"        Color="#E0E0F0"/>
+        <SolidColorBrush x:Key="SubtextBrush"     Color="#9090AA"/>
+        <SolidColorBrush x:Key="BorderBrush"      Color="#3A3A5C"/>
+        <SolidColorBrush x:Key="ButtonHoverBrush" Color="#3A3A6A"/>
+
+        <!-- ================================================================
+             Base button style
+             ================================================================ -->
+        <Style x:Key="ToolButtonStyle" TargetType="Button">
+            <Setter Property="Background"   Value="Transparent"/>
+            <Setter Property="Foreground"   Value="{StaticResource TextBrush}"/>
+            <Setter Property="BorderBrush"  Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding"      Value="8,5"/>
+            <Setter Property="Cursor"       Value="Hand"/>
+            <Setter Property="FontSize"     Value="12"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background"
+                                        Value="{StaticResource ButtonHoverBrush}"/>
+                                <Setter Property="BorderBrush"
+                                        Value="{StaticResource AccentBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.4"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ================================================================
+             Separator style
+             ================================================================ -->
+        <Style x:Key="ToolSeparatorStyle" TargetType="Separator">
+            <Setter Property="Background"   Value="{StaticResource BorderBrush}"/>
+            <Setter Property="Width"        Value="1"/>
+            <Setter Property="Margin"       Value="4,4"/>
+        </Style>
+
+        <!-- ================================================================
+             Zoom ComboBox style
+             ================================================================ -->
+        <Style x:Key="ZoomComboStyle" TargetType="ComboBox">
+            <Setter Property="Background"        Value="{StaticResource SurfaceBrush}"/>
+            <Setter Property="Foreground"        Value="{StaticResource TextBrush}"/>
+            <Setter Property="BorderBrush"       Value="{StaticResource BorderBrush}"/>
+            <Setter Property="Width"             Value="80"/>
+            <Setter Property="Height"            Value="26"/>
+            <Setter Property="FontSize"          Value="12"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+
+        <!-- ================================================================
+             TextBlock label style
+             ================================================================ -->
+        <Style x:Key="StatusLabelStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource SubtextBrush}"/>
+            <Setter Property="FontSize"   Value="11"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <!-- Menu bar -->
+            <RowDefinition Height="Auto"/>
+            <!-- Toolbar -->
+            <RowDefinition Height="Auto"/>
+            <!-- Main content area -->
+            <RowDefinition Height="*"/>
+            <!-- Status bar -->
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ================================================================
+             [ROW 0] Menu Bar
+             ================================================================ -->
+        <Menu Grid.Row="0"
+              Background="{StaticResource ToolbarBrush}"
+              Foreground="{StaticResource TextBrush}"
+              BorderBrush="{StaticResource BorderBrush}"
+              BorderThickness="0,0,0,1">
+            <MenuItem Header="_File" Foreground="{StaticResource TextBrush}">
+                <MenuItem Header="_Open…"   InputGestureText="Ctrl+O"
+                          Command="{Binding OpenCommand}"/>
+                <MenuItem Header="_Save"    InputGestureText="Ctrl+S"
+                          Command="{Binding SaveCommand}"/>
+                <MenuItem Header="Save _As…" InputGestureText="Ctrl+Shift+S"
+                          Command="{Binding SaveAsCommand}"/>
+                <Separator/>
+                <MenuItem Header="E_xit"   InputGestureText="Alt+F4"
+                          Command="{Binding ExitCommand}"/>
+            </MenuItem>
+            <MenuItem Header="_Edit" Foreground="{StaticResource TextBrush}">
+                <MenuItem Header="_Undo"   InputGestureText="Ctrl+Z"
+                          Command="ApplicationCommands.Undo"/>
+                <MenuItem Header="_Redo"   InputGestureText="Ctrl+Y"
+                          Command="ApplicationCommands.Redo"/>
+                <Separator/>
+                <MenuItem Header="Select _All" InputGestureText="Ctrl+A"
+                          Command="ApplicationCommands.SelectAll"/>
+            </MenuItem>
+            <MenuItem Header="_View" Foreground="{StaticResource TextBrush}">
+                <MenuItem Header="Zoom _In"  Command="{Binding ZoomInCommand}"/>
+                <MenuItem Header="Zoom _Out" Command="{Binding ZoomOutCommand}"/>
+                <MenuItem Header="Fit to _Width" Command="{Binding FitWidthCommand}"/>
+                <Separator/>
+                <MenuItem Header="_Thumbnail Panel"
+                          IsCheckable="True"
+                          IsChecked="{Binding ShowThumbnails}"/>
+            </MenuItem>
+            <MenuItem Header="_Help" Foreground="{StaticResource TextBrush}">
+                <MenuItem Header="_About…" Command="{Binding AboutCommand}"/>
+            </MenuItem>
+        </Menu>
+
+        <!-- ================================================================
+             [ROW 1] Toolbar
+             ================================================================ -->
+        <Border Grid.Row="1"
+                Background="{StaticResource ToolbarBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="0,0,0,1"
+                Padding="6,4">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+
+                <!-- File operations -->
+                <Button Style="{StaticResource ToolButtonStyle}"
+                        Command="{Binding OpenCommand}"
+                        ToolTip="Open PDF (Ctrl+O)">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <TextBlock Text="📂" FontSize="14"/>
+                        <TextBlock Text="Open"/>
+                    </StackPanel>
+                </Button>
+
+                <Button Style="{StaticResource ToolButtonStyle}"
+                        Command="{Binding SaveCommand}"
+                        ToolTip="Save (Ctrl+S)">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <TextBlock Text="💾" FontSize="14"/>
+                        <TextBlock Text="Save"/>
+                    </StackPanel>
+                </Button>
+
+                <Separator Style="{StaticResource ToolSeparatorStyle}"/>
+
+                <!-- Zoom controls -->
+                <Button Style="{StaticResource ToolButtonStyle}"
+                        Command="{Binding ZoomOutCommand}"
+                        ToolTip="Zoom Out (Ctrl+-)">
+                    <TextBlock Text="🔍−" FontSize="14"/>
+                </Button>
+
+                <ComboBox Style="{StaticResource ZoomComboStyle}"
+                          ItemsSource="{Binding ZoomLevels}"
+                          SelectedItem="{Binding SelectedZoomLabel}"
+                          ToolTip="Zoom Level"
+                          Margin="4,0"/>
+
+                <Button Style="{StaticResource ToolButtonStyle}"
+                        Command="{Binding ZoomInCommand}"
+                        ToolTip="Zoom In (Ctrl++)">
+                    <TextBlock Text="🔍+" FontSize="14"/>
+                </Button>
+
+                <Separator Style="{StaticResource ToolSeparatorStyle}"/>
+
+                <!-- Edit mode indicator -->
+                <Border Background="#1A0078D4" BorderBrush="{StaticResource AccentBrush}"
+                        BorderThickness="1" CornerRadius="4" Padding="8,3" Margin="4,0">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <Ellipse Width="8" Height="8" Fill="#00C853"
+                                 VerticalAlignment="Center"/>
+                        <TextBlock Text="Text Edit Mode Active"
+                                   Foreground="{StaticResource AccentBrush}"
+                                   FontSize="11" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+
+                <Separator Style="{StaticResource ToolSeparatorStyle}"/>
+
+                <!-- Page navigation -->
+                <Button Style="{StaticResource ToolButtonStyle}"
+                        Command="{Binding PreviousPageCommand}"
+                        ToolTip="Previous Page">
+                    <TextBlock Text="◀" FontSize="12"/>
+                </Button>
+
+                <Border Background="{StaticResource SurfaceBrush}"
+                        BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="1" CornerRadius="4"
+                        Padding="6,2" Margin="2,0">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <TextBox Text="{Binding CurrentPageDisplay, UpdateSourceTrigger=PropertyChanged}"
+                                 Background="Transparent"
+                                 Foreground="{StaticResource TextBrush}"
+                                 BorderThickness="0"
+                                 Width="30" TextAlignment="Center"
+                                 VerticalContentAlignment="Center"
+                                 FontSize="12"/>
+                        <TextBlock Text="/" Foreground="{StaticResource SubtextBrush}"
+                                   VerticalAlignment="Center" FontSize="12"/>
+                        <TextBlock Text="{Binding TotalPages}"
+                                   Foreground="{StaticResource SubtextBrush}"
+                                   VerticalAlignment="Center" FontSize="12"/>
+                    </StackPanel>
+                </Border>
+
+                <Button Style="{StaticResource ToolButtonStyle}"
+                        Command="{Binding NextPageCommand}"
+                        ToolTip="Next Page">
+                    <TextBlock Text="▶" FontSize="12"/>
+                </Button>
+
+            </StackPanel>
+        </Border>
+
+        <!-- ================================================================
+             [ROW 2] Main Content: Thumbnail Panel + PDF Canvas + Properties
+             ================================================================ -->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <!-- Thumbnail sidebar (collapsible) -->
+                <ColumnDefinition Width="{Binding ThumbnailPanelWidth}"/>
+                <ColumnDefinition Width="Auto"/>
+                <!-- PDF canvas area -->
+                <ColumnDefinition Width="*"/>
+                <!-- Properties panel -->
+                <ColumnDefinition Width="220"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- ============================================================
+                 Thumbnail Panel
+                 ============================================================ -->
+            <Border Grid.Column="0"
+                    Background="{StaticResource SidebarBrush}"
+                    BorderBrush="{StaticResource BorderBrush}"
+                    BorderThickness="0,0,1,0"
+                    Visibility="{Binding ThumbnailPanelVisibility}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <Border Grid.Row="0" Padding="8,6"
+                            BorderBrush="{StaticResource BorderBrush}"
+                            BorderThickness="0,0,0,1">
+                        <TextBlock Text="Pages" FontSize="11" FontWeight="SemiBold"
+                                   Foreground="{StaticResource SubtextBrush}"
+                                   LetterSpacing="1"/>
+                    </Border>
+
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding PageThumbnails}"
+                                      Margin="4">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Margin="4" Padding="4"
+                                            Background="{StaticResource SurfaceBrush}"
+                                            BorderBrush="{StaticResource BorderBrush}"
+                                            BorderThickness="1" CornerRadius="4"
+                                            Cursor="Hand">
+                                        <Border.InputBindings>
+                                            <MouseBinding Gesture="LeftClick"
+                                                          Command="{Binding DataContext.GoToPageCommand,
+                                                              RelativeSource={RelativeSource AncestorType=Window}}"
+                                                          CommandParameter="{Binding PageIndex}"/>
+                                        </Border.InputBindings>
+                                        <StackPanel>
+                                            <Image Source="{Binding Thumbnail}"
+                                                   Width="120" Stretch="Uniform"/>
+                                            <TextBlock Text="{Binding PageNumber}"
+                                                       Foreground="{StaticResource SubtextBrush}"
+                                                       FontSize="10" TextAlignment="Center"
+                                                       Margin="0,4,0,0"/>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+
+            <!-- Splitter -->
+            <GridSplitter Grid.Column="1" Width="4"
+                          Background="{StaticResource BorderBrush}"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Stretch"/>
+
+            <!-- ============================================================
+                 PDF Canvas Area
+                 ============================================================ -->
+            <Border Grid.Column="2"
+                    Background="#111122"
+                    BorderBrush="{StaticResource BorderBrush}"
+                    BorderThickness="0">
+                <ScrollViewer x:Name="PdfScrollViewer"
+                              HorizontalScrollBarVisibility="Auto"
+                              VerticalScrollBarVisibility="Auto"
+                              Background="Transparent"
+                              PanningMode="Both">
+                    <!-- The PdfPageView control is instantiated in code-behind
+                         and added to this ContentPresenter. -->
+                    <ContentPresenter x:Name="PageViewHost"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Top"
+                                      Margin="20"/>
+                </ScrollViewer>
+            </Border>
+
+            <!-- ============================================================
+                 Properties / Info Panel (right sidebar)
+                 ============================================================ -->
+            <Border Grid.Column="3"
+                    Background="{StaticResource SidebarBrush}"
+                    BorderBrush="{StaticResource BorderBrush}"
+                    BorderThickness="1,0,0,0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="12,16" Spacing="12">
+
+                        <TextBlock Text="PROPERTIES" FontSize="10" FontWeight="Bold"
+                                   Foreground="{StaticResource SubtextBrush}"
+                                   LetterSpacing="1.5"/>
+
+                        <!-- Document info -->
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="Document" FontSize="12" FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextBrush}"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition/>
+                                    <RowDefinition/>
+                                    <RowDefinition/>
+                                </Grid.RowDefinitions>
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Pages:"
+                                           Style="{StaticResource StatusLabelStyle}"
+                                           Margin="0,0,8,4"/>
+                                <TextBlock Grid.Row="0" Grid.Column="1"
+                                           Text="{Binding TotalPages}"
+                                           Foreground="{StaticResource TextBrush}"
+                                           FontSize="11"/>
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="File:"
+                                           Style="{StaticResource StatusLabelStyle}"
+                                           Margin="0,0,8,4"/>
+                                <TextBlock Grid.Row="1" Grid.Column="1"
+                                           Text="{Binding FileName}"
+                                           Foreground="{StaticResource TextBrush}"
+                                           FontSize="11" TextWrapping="Wrap"/>
+                            </Grid>
+                        </StackPanel>
+
+                        <Separator Background="{StaticResource BorderBrush}" Height="1"/>
+
+                        <!-- Selected paragraph info -->
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="Selected Paragraph" FontSize="12"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextBrush}"/>
+
+                            <Grid Visibility="{Binding ParagraphInfoVisibility}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition/><RowDefinition/><RowDefinition/>
+                                    <RowDefinition/><RowDefinition/>
+                                </Grid.RowDefinitions>
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Font:"
+                                           Style="{StaticResource StatusLabelStyle}" Margin="0,0,8,4"/>
+                                <TextBlock Grid.Row="0" Grid.Column="1"
+                                           Text="{Binding SelectedParaFont}"
+                                           Foreground="{StaticResource TextBrush}" FontSize="11" TextWrapping="Wrap"/>
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Size:"
+                                           Style="{StaticResource StatusLabelStyle}" Margin="0,0,8,4"/>
+                                <TextBlock Grid.Row="1" Grid.Column="1"
+                                           Text="{Binding SelectedParaFontSize}"
+                                           Foreground="{StaticResource TextBrush}" FontSize="11"/>
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Bold:"
+                                           Style="{StaticResource StatusLabelStyle}" Margin="0,0,8,4"/>
+                                <TextBlock Grid.Row="2" Grid.Column="1"
+                                           Text="{Binding SelectedParaBold}"
+                                           Foreground="{StaticResource TextBrush}" FontSize="11"/>
+
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Lines:"
+                                           Style="{StaticResource StatusLabelStyle}" Margin="0,0,8,4"/>
+                                <TextBlock Grid.Row="3" Grid.Column="1"
+                                           Text="{Binding SelectedParaLineCount}"
+                                           Foreground="{StaticResource TextBrush}" FontSize="11"/>
+
+                                <TextBlock Grid.Row="4" Grid.Column="0" Text="BBox:"
+                                           Style="{StaticResource StatusLabelStyle}" Margin="0,0,8,4"/>
+                                <TextBlock Grid.Row="4" Grid.Column="1"
+                                           Text="{Binding SelectedParaBBox}"
+                                           Foreground="{StaticResource TextBrush}" FontSize="10"
+                                           TextWrapping="Wrap"/>
+                            </Grid>
+
+                            <TextBlock Text="Click a paragraph to inspect it."
+                                       Style="{StaticResource StatusLabelStyle}"
+                                       TextWrapping="Wrap"
+                                       Visibility="{Binding NoParagraphSelectedVisibility}"/>
+                        </StackPanel>
+
+                        <Separator Background="{StaticResource BorderBrush}" Height="1"/>
+
+                        <!-- Editing tips -->
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Editing Tips" FontSize="12" FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextBrush}"/>
+                            <TextBlock TextWrapping="Wrap" FontSize="10"
+                                       Foreground="{StaticResource SubtextBrush}"
+                                       LineHeight="16">
+                                • Click any paragraph to start inline editing.&#x0a;
+                                • Type to replace text with live reflow.&#x0a;
+                                • Tab or click outside to commit changes.&#x0a;
+                                • Esc to cancel and revert.&#x0a;
+                                • Ctrl+Z / Ctrl+Y for undo/redo within the editor.
+                            </TextBlock>
+                        </StackPanel>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+
+        <!-- ================================================================
+             [ROW 3] Status Bar
+             ================================================================ -->
+        <Border Grid.Row="3"
+                Background="{StaticResource AccentBrush}"
+                Padding="10,3">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0"
+                           Text="{Binding StatusMessage}"
+                           Foreground="White" FontSize="11"
+                           VerticalAlignment="Center"/>
+
+                <TextBlock Grid.Column="1"
+                           Text="{Binding CursorPosition}"
+                           Foreground="#CCffffff" FontSize="11"
+                           VerticalAlignment="Center"
+                           Margin="0,0,16,0"/>
+
+                <TextBlock Grid.Column="2"
+                           Text="{Binding SelectedZoomLabel}"
+                           Foreground="#CCffffff" FontSize="11"
+                           VerticalAlignment="Center"
+                           Margin="0,0,16,0"/>
+
+                <TextBlock Grid.Column="3"
+                           Text="{Binding DocumentState}"
+                           Foreground="#CCffffff" FontSize="11"
+                           VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
