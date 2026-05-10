@@ -1,11 +1,12 @@
 <Window x:Class="RaselPdfPro.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Rasel Mia PDF Studio Pro - Enterprise Edition" Height="850" Width="1300" 
+        xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
+        Title="Rasel Mia PDF Studio Pro" Height="850" Width="1300" 
         Background="#1E1E1E" FontFamily="Segoe UI" WindowStartupLocation="CenterScreen">
     
     <Window.Resources>
-        <!-- কাস্টম বাটন স্টাইল (Hover Effect) -->
+        <!-- কাস্টম বাটন স্টাইল -->
         <Style x:Key="ProButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="#CCCCCC"/>
@@ -13,7 +14,7 @@
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="FontSize" Value="14"/>
             <Setter Property="Template">
-                <Setter.Value> <!-- এখানেই সেই এরর ফিক্সটি যুক্ত করা হয়েছে -->
+                <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border Background="{TemplateBinding Background}" CornerRadius="4">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
@@ -35,68 +36,51 @@
 
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="55"/> <!-- Top Menu / Toolbar -->
-            <RowDefinition Height="*"/>  <!-- Main Workspace -->
-            <RowDefinition Height="30"/> <!-- Status Bar -->
+            <RowDefinition Height="55"/> 
+            <RowDefinition Height="*"/>  
+            <RowDefinition Height="30"/> 
         </Grid.RowDefinitions>
 
-        <!-- টপ টুলবার (Modern Ribbon Style) -->
+        <!-- টপ টুলবার -->
         <Border Grid.Row="0" Background="#2D2D30" BorderBrush="#000000" BorderThickness="0,0,0,1">
             <DockPanel LastChildFill="False">
-                <!-- File Tools -->
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" Margin="10,0">
                     <Button Content="📂 Open" Style="{StaticResource ProButtonStyle}" Click="OpenPdf_Click"/>
                     <Button Content="💾 Save" Style="{StaticResource ProButtonStyle}" Click="SavePdf_Click"/>
                 </StackPanel>
                 
-                <!-- Divider -->
                 <Rectangle Width="1" Fill="#555555" Margin="5,15" DockPanel.Dock="Left"/>
 
-                <!-- Editing Tools -->
-                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" Margin="10,0">
-                    <Button Content="✋ Hand Tool" Style="{StaticResource ProButtonStyle}" Click="HandTool_Click"/>
-                    <Button Content="✏️ Edit Text" Style="{StaticResource ProButtonStyle}" Click="EditTool_Click" Foreground="#00CEFF"/>
-                </StackPanel>
-
-                <!-- Branding -->
-                <TextBlock Text="Rasel PDF Studio - Advanced Apryse Engine" DockPanel.Dock="Right" 
+                <TextBlock Text="Rasel PDF Studio - Enterprise Edition" DockPanel.Dock="Right" 
                            Foreground="#888888" VerticalAlignment="Center" Margin="0,0,20,0" FontWeight="SemiBold"/>
             </DockPanel>
         </Border>
 
-        <!-- মেইন ওয়ার্কস্পেস (Sidebar + Canvas) -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="250"/> <!-- Sidebar -->
-                <ColumnDefinition Width="*"/>   <!-- Document Viewer -->
+                <ColumnDefinition Width="250"/>
+                <ColumnDefinition Width="*"/>   
             </Grid.ColumnDefinitions>
 
-            <!-- লেফট সাইডবার (টুলস বা থাম্বনেইলের জন্য) -->
+            <!-- লেফট সাইডবার -->
             <Border Grid.Column="0" Background="#252526" BorderBrush="#3E3E42" BorderThickness="0,0,1,0">
                 <StackPanel Margin="15">
                     <TextBlock Text="DOCUMENT INFO" Foreground="#888888" FontSize="12" FontWeight="Bold" Margin="0,0,0,10"/>
                     <TextBlock x:Name="FileNameText" Text="No file opened" Foreground="#CCCCCC" TextWrapping="Wrap" Margin="0,0,0,20"/>
-                    
-                    <TextBlock Text="PRO FEATURES" Foreground="#888888" FontSize="12" FontWeight="Bold" Margin="0,0,0,10"/>
-                    <TextBlock Text="✔️ Paragraph Reflow" Foreground="#28A745" Margin="0,5"/>
-                    <TextBlock Text="✔️ Inline Text Editing" Foreground="#28A745" Margin="0,5"/>
-                    <TextBlock Text="✔️ Hardware Acceleration" Foreground="#28A745" Margin="0,5"/>
                 </StackPanel>
             </Border>
 
-            <!-- পিডিএফ ক্যানভাস -->
+            <!-- পিডিএফ ক্যানভাস (Syncfusion) -->
             <Border Grid.Column="1" Background="#1A1A1A">
-                <Border x:Name="ViewerContainer" Margin="10">
-                    <!-- Apryse Engine will inject here -->
-                </Border>
+                <syncfusion:PdfViewerControl x:Name="PdfViewer" Margin="10"/>
             </Border>
         </Grid>
 
-        <!-- নিচের স্ট্যাটাস বার -->
+        <!-- স্ট্যাটাস বার -->
         <Border Grid.Row="2" Background="#007ACC">
             <DockPanel LastChildFill="False">
                 <TextBlock Text="Ready" Foreground="White" Margin="10,0" VerticalAlignment="Center"/>
-                <TextBlock x:Name="StatusText" Text="Engine: PDFTron 64-bit | RAM Optimized" DockPanel.Dock="Right" Foreground="White" Margin="10,0" VerticalAlignment="Center"/>
+                <TextBlock x:Name="StatusText" Text="Engine: Syncfusion | GitHub Actions Ready" DockPanel.Dock="Right" Foreground="White" Margin="10,0" VerticalAlignment="Center"/>
             </DockPanel>
         </Border>
     </Grid>
